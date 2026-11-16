@@ -1,0 +1,15 @@
+# Local ACL recovery records and conversation notes
+acl-*
+对话.txt
+
+# Dependencies, test output, and local configuration
+node_modules/
+test-results/
+playwright-report/
+__pycache__/
+*.pyc
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db

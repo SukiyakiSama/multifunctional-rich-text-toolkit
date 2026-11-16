@@ -1,0 +1,3552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="纯前端富文本显示器与图片转富文本转换器，支持像素画、批量转换和本地导出。">
+  <title>富文本显示器 · Rich Text Display</title>
+  <style>
+    :root {
+      --bg: #f3eee6;
+      --ink: #241e1a;
+      --muted: #7d7168;
+      --line: rgba(36, 30, 26, 0.12);
+      --paper: #fffdf8;
+      --accent: #e8590c;
+      --accent-soft: #ffd8a8;
+      --night: #1b1714;
+      --night-raised: #241f1b;
+      --night-line: rgba(255, 255, 255, 0.09);
+      --night-text: #f7efe5;
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --shadow: 0 34px 80px -34px rgba(57, 39, 24, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: light;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 560px at 8% -8%, rgba(255, 200, 130, 0.55), transparent 60%),
+        radial-gradient(820px 520px at 98% 0%, rgba(196, 173, 255, 0.48), transparent 58%),
+        radial-gradient(900px 640px at 52% 112%, rgba(160, 226, 184, 0.28), transparent 62%),
+        var(--bg);
+      font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      content: "";
+      opacity: 0.42;
+      background-image:
+        linear-gradient(rgba(76, 58, 42, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(76, 58, 42, 0.055) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: radial-gradient(circle at 50% 25%, #000 0%, transparent 76%);
+      -webkit-mask-image: radial-gradient(circle at 50% 25%, #000 0%, transparent 76%);
+    }
+
+    button,
+    textarea,
+    select,
+    input {
+      font: inherit;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    button:focus-visible,
+    textarea:focus-visible,
+    select:focus-visible,
+    input:focus-visible,
+    label:focus-within {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 26px clamp(18px, 4vw, 54px) 34px;
+    }
+
+    .site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-bottom: clamp(26px, 4vw, 50px);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 44px;
+      height: 44px;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      border-radius: 14px;
+      color: #fff;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.35), transparent 48%),
+        linear-gradient(135deg, #f08c00, #e5484d 52%, #9c36b5);
+      box-shadow: 0 10px 24px -10px rgba(229, 72, 77, 0.65);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 24px;
+      font-style: italic;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .brand-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      line-height: 1.1;
+    }
+
+    .brand-copy strong {
+      font-size: 15px;
+      font-weight: 750;
+      letter-spacing: 0.02em;
+    }
+
+    .brand-copy small {
+      color: var(--muted);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+    }
+
+    .header-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 999px;
+      color: #65584f;
+      background: rgba(255, 253, 248, 0.55);
+      box-shadow: 0 8px 28px -18px rgba(48, 35, 24, 0.4);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #2f9e44;
+      box-shadow: 0 0 0 4px rgba(47, 158, 68, 0.13);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 4px rgba(47, 158, 68, 0.13); }
+      50% { box-shadow: 0 0 0 7px rgba(47, 158, 68, 0.04); }
+    }
+
+    .hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: clamp(28px, 5vw, 88px);
+      padding-bottom: clamp(30px, 4vw, 48px);
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--accent);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(34px, 5.2vw, 66px);
+      font-weight: 800;
+      letter-spacing: -0.055em;
+      line-height: 1.03;
+    }
+
+    .hero h1 em {
+      color: transparent;
+      background: linear-gradient(105deg, #e8590c 0%, #e5484d 42%, #9c36b5 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      font-style: normal;
+    }
+
+    .hero-copy {
+      max-width: 385px;
+      margin: 0 0 5px;
+      color: #6e6158;
+      font-size: 14px;
+      line-height: 1.85;
+    }
+
+    .hero-copy code {
+      padding: 2px 5px;
+      border: 1px solid rgba(36, 30, 26, 0.08);
+      border-radius: 5px;
+      color: #b8420b;
+      background: rgba(255, 253, 248, 0.66);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.9em;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
+      gap: clamp(14px, 1.7vw, 22px);
+      align-items: stretch;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      height: clamp(560px, 67vh, 740px);
+      overflow: hidden;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+    }
+
+    .editor-panel {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--night-text);
+      background:
+        radial-gradient(500px 220px at 0% 0%, rgba(240, 140, 0, 0.1), transparent 70%),
+        var(--night);
+    }
+
+    .preview-panel {
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      background: rgba(255, 253, 248, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 70px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--night-line);
+    }
+
+    .preview-panel .panel-head {
+      border-bottom-color: var(--line);
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+    }
+
+    .panel-icon {
+      display: grid;
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border: 1px solid var(--night-line);
+      border-radius: 10px;
+      color: #ffc078;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .preview-panel .panel-icon {
+      border-color: rgba(36, 30, 26, 0.09);
+      color: #b8420b;
+      background: #fff7ec;
+    }
+
+    .panel-title h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .panel-title p {
+      margin: 3px 0 0;
+      overflow: hidden;
+      color: rgba(247, 239, 229, 0.45);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 9px;
+      letter-spacing: 0.09em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .preview-panel .panel-title p {
+      color: #95877c;
+    }
+
+    .head-actions {
+      display: flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .ghost-button {
+      padding: 7px 11px;
+      border: 1px solid var(--night-line);
+      border-radius: 8px;
+      color: rgba(247, 239, 229, 0.65);
+      background: transparent;
+      font-size: 11px;
+      cursor: pointer;
+      transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .ghost-button:hover {
+      border-color: rgba(255, 255, 255, 0.22);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 9px;
+      border: 1px solid rgba(47, 158, 68, 0.18);
+      border-radius: 999px;
+      color: #2b7a3a;
+      background: rgba(47, 158, 68, 0.08);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+    }
+
+    .status-pill::before {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #2f9e44;
+      content: "";
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+      min-height: 55px;
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--night-line);
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    .tool-group {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .divider {
+      width: 1px;
+      height: 20px;
+      margin: 0 5px;
+      background: var(--night-line);
+    }
+
+    .tool {
+      display: grid;
+      width: 31px;
+      height: 31px;
+      padding: 0;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: rgba(247, 239, 229, 0.72);
+      background: transparent;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 14px;
+      cursor: pointer;
+      transition: color 140ms ease, background 140ms ease, border-color 140ms ease, transform 140ms ease;
+    }
+
+    .tool:hover {
+      border-color: var(--night-line);
+      color: #fff;
+      background: rgba(255, 255, 255, 0.07);
+      transform: translateY(-1px);
+    }
+
+    .tool:active {
+      transform: translateY(0);
+    }
+
+    .tool[data-tag="u"] {
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .tool[data-tag="s"] {
+      text-decoration: line-through;
+    }
+
+    .tool.symbol-tool {
+      font-family: "Segoe UI Symbol", "Segoe UI", sans-serif;
+      font-size: 15px;
+    }
+
+    .color-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 2px;
+    }
+
+    .color-dot {
+      position: relative;
+      width: 19px;
+      height: 19px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 50%;
+      background: var(--dot);
+      box-shadow: inset 0 0 0 2px var(--night);
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease;
+    }
+
+    .color-dot:hover {
+      box-shadow: inset 0 0 0 2px var(--night), 0 0 0 2px var(--dot);
+      transform: scale(1.12);
+    }
+
+    .custom-color {
+      position: relative;
+      display: grid;
+      width: 21px;
+      height: 21px;
+      margin-left: 1px;
+      overflow: hidden;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 50%;
+      background: conic-gradient(#e5484d, #f08c00, #2f9e44, #1c7ed6, #9c36b5, #e5484d);
+      cursor: pointer;
+    }
+
+    .custom-color::after {
+      position: absolute;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--night);
+      content: "+";
+      color: rgba(255, 255, 255, 0.74);
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 9px;
+      line-height: 9px;
+      text-align: center;
+    }
+
+    .custom-color input {
+      position: absolute;
+      inset: -8px;
+      width: 40px;
+      height: 40px;
+      border: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .select-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      height: 31px;
+      padding: 0 8px;
+      border: 1px solid var(--night-line);
+      border-radius: 8px;
+      color: rgba(247, 239, 229, 0.48);
+      background: rgba(255, 255, 255, 0.035);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .select-wrap select {
+      max-width: 62px;
+      padding: 0 14px 0 0;
+      border: 0;
+      color: rgba(247, 239, 229, 0.82);
+      background: transparent;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .select-wrap select option {
+      color: var(--ink);
+      background: #fffdf8;
+    }
+
+    .panel.editor-panel { height: auto; min-height: clamp(560px, 67vh, 740px); }
+    .editor-panel .editor-wrap { min-height: 240px; }
+    .format-library { flex: 0 0 auto; border-bottom: 1px solid var(--night-line); }
+    .style-library + .style-library { border-top: 1px solid var(--night-line); }
+    .style-library summary {
+      padding: 10px 16px;
+      color: #f0dfce;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .style-library summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .library-count, .library-hint { color: #b6a698; font-size: 10px; font-weight: 400; }
+    .library-count { margin-left: 7px; }
+    .library-hint { margin: 8px 0 0; line-height: 1.7; }
+    .library-body { padding: 0 16px 12px; }
+    #gradientLibrary .gradient-scroll { max-height: 310px; overflow-y: auto; }
+    .gradient-footer .gradient-actions { margin-top: 0; }
+    .preset-list { display: flex; flex-wrap: wrap; gap: 7px; max-height: 110px; overflow-y: auto; }
+    .preset-item { display: inline-flex; min-width: 0; max-width: 100%; border: 1px solid var(--night-line); border-radius: 8px; overflow: hidden; }
+    .preset-apply, .preset-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: 0;
+      color: #f7efe5;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .preset-apply { min-width: 0; }
+    .preset-apply:hover, .preset-action:hover { background: rgba(255, 255, 255, 0.12); }
+    .preset-apply .preset-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .preset-action { padding: 6px; border-left: 1px solid var(--night-line); color: #b6a698; }
+    .preset-swatch { flex: 0 0 auto; width: 18px; height: 18px; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; }
+    .gradient-swatch { width: 34px; }
+    .preset-mode { color: #ffc078; font-size: 9px; white-space: nowrap; }
+    .library-form, .gradient-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 10px; }
+    .library-body input, .library-body select {
+      min-width: 0;
+      padding: 6px 8px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 7px;
+      color: #f7efe5;
+      background: #2c241e;
+      font-size: 11px;
+    }
+    .library-body input::placeholder { color: #b6a698; }
+    .library-body input[type="color"] { flex: 0 0 auto; width: 30px; height: 30px; padding: 2px; cursor: pointer; }
+    .library-body .hex-input { flex: 0 0 88px; width: 88px; font-family: Consolas, monospace; }
+    .library-body .name-input { flex: 1 1 100px; width: 100px; max-width: 180px; }
+    .library-body select option { color: #f7efe5; background: #2c241e; }
+    .library-body .ghost-button { color: #e8d6c4; }
+    .library-body .apply-paint { color: #ffc078; border-color: rgba(255,192,120,0.38); }
+    .gradient-stops { display: grid; gap: 7px; }
+    .gradient-stop { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+    .stop-number { flex: 0 0 30px; color: #b6a698; font-size: 10px; }
+    .gradient-stop select { flex: 1 1 80px; max-width: 180px; }
+    .gradient-stop .remove-stop { padding: 5px 8px; }
+    .gradient-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 10px 0; }
+    .gradient-controls label { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #b6a698; }
+    .gradient-demo { padding: 9px 12px; border: 1px solid var(--night-line); border-radius: 9px; background: #15110e; font-size: 18px; line-height: 1.4; }
+    .gradient-demo > span { display: inline-block; }
+    #gradientPresets { margin-bottom: 10px; }
+    .library-notice { margin: 0; padding: 0 16px 10px; color: #ffc078; font-size: 11px; line-height: 1.6; }
+
+    .color-table-popup {
+      position: fixed;
+      z-index: 50;
+      width: min(336px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 12px;
+      color: #f7efe5;
+      background: #241e19;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    }
+    .color-table-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .color-table-head strong { font-size: 12px; }
+    .color-table-grid { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+    .color-table-cell {
+      position: relative;
+      min-width: 0;
+      height: 26px;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 3px;
+      background: var(--swatch);
+      cursor: pointer;
+    }
+    .color-table-cell:hover, .color-table-cell:focus-visible { z-index: 1; outline: 2px solid #ffc078; outline-offset: 1px; }
+    .color-table-cell[aria-pressed="true"]::after { content: "✓"; color: #fff; font-size: 14px; text-shadow: 0 1px 2px #000, 0 0 2px #000; }
+    .color-table-info { display: flex; align-items: center; gap: 8px; margin-top: 10px; font: 12px Consolas, monospace; }
+    .color-table-info span:first-child { width: 18px; height: 18px; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; }
+    .color-table-popup p { margin: 8px 0 0; color: #b6a698; font-size: 11px; line-height: 1.5; }
+
+    .editor-wrap {
+      position: relative;
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      padding: 6px 0 0;
+    }
+
+    .editor-wrap::before {
+      position: absolute;
+      top: 25px;
+      bottom: 20px;
+      left: 17px;
+      width: 1px;
+      pointer-events: none;
+      background: linear-gradient(transparent, rgba(255, 255, 255, 0.07) 12%, rgba(255, 255, 255, 0.07) 88%, transparent);
+      content: "";
+    }
+
+    #editor {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      padding: 22px 24px 30px 34px;
+      overflow: auto;
+      border: 0;
+      outline: 0;
+      color: #f8efe6;
+      background: transparent;
+      caret-color: #ffa94d;
+      font-family: "Cascadia Code", "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+      font-size: 13.5px;
+      font-weight: 400;
+      line-height: 1.95;
+      resize: none;
+      tab-size: 2;
+      white-space: pre-wrap;
+    }
+
+    #editor::placeholder {
+      color: rgba(247, 239, 229, 0.26);
+    }
+
+    #editor::selection {
+      color: #fff;
+      background: rgba(232, 89, 12, 0.44);
+    }
+
+    #editor::-webkit-scrollbar,
+    .paper-wrap::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    #editor::-webkit-scrollbar-thumb {
+      border: 3px solid var(--night);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .panel-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 42px;
+      padding: 9px 20px;
+      border-top: 1px solid var(--night-line);
+      color: rgba(247, 239, 229, 0.4);
+      font-size: 10px;
+    }
+
+    .preview-panel .panel-foot {
+      border-top-color: var(--line);
+      color: #95877c;
+    }
+
+    .foot-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .foot-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 9px;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    .mobile-jump {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      color: #ffc078;
+      font-size: 10px;
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .mobile-jump:hover {
+      color: #ffd8a8;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .foot-hint kbd {
+      padding: 2px 5px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      color: rgba(247, 239, 229, 0.6);
+      background: rgba(255, 255, 255, 0.04);
+      font: inherit;
+    }
+
+    .counter {
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.025em;
+      white-space: nowrap;
+    }
+
+    .safe-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .safe-badge::before {
+      display: grid;
+      width: 13px;
+      height: 13px;
+      place-items: center;
+      border-radius: 50%;
+      color: #2b7a3a;
+      background: rgba(47, 158, 68, 0.12);
+      content: "✓";
+      font-size: 8px;
+      font-weight: 800;
+    }
+
+    .paper-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      padding: clamp(16px, 2.4vw, 28px);
+      overflow: auto;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.35), transparent 40%),
+        rgba(246, 241, 232, 0.72);
+    }
+
+    .paper {
+      position: relative;
+      min-height: 100%;
+      overflow: hidden;
+      padding: clamp(26px, 4vw, 48px) clamp(22px, 4.2vw, 52px);
+      border: 1px solid rgba(89, 68, 50, 0.11);
+      border-radius: 16px;
+      background: var(--paper);
+      box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.9) inset,
+        0 18px 44px -30px rgba(70, 50, 31, 0.35);
+    }
+
+    .paper::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #f08c00, #e5484d 35%, #9c36b5 68%, #1c7ed6);
+      content: "";
+      opacity: 0.72;
+    }
+
+    .preview-content {
+      position: relative;
+      z-index: 1;
+      min-height: 180px;
+      color: #2a211b;
+      font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.9;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .preview-content a {
+      color: #1c7ed6;
+    }
+
+    .image-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+    }
+
+    .image-tools select, .image-tools button {
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    .pixel-preview { white-space: normal; min-height: 0; }
+    .pixel-preview canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 / 16px 16px;
+    }
+    .paper:has(.pixel-preview) { overflow: visible; padding: 20px; }
+    .pixel-preview canvas.pixel-zoom { max-width: none; margin: 0; }
+    #imageInfo { color: var(--muted); }
+
+    .image-converter {
+      margin-bottom: 24px;
+      padding: clamp(20px, 3vw, 30px);
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: var(--radius-xl);
+      background: rgba(255, 253, 248, 0.8);
+      box-shadow: var(--shadow);
+    }
+
+    .converter-heading { margin-bottom: 20px; }
+    .converter-heading h2 { margin: 0 0 8px; font-size: 21px; letter-spacing: -0.03em; }
+    .converter-heading p, .converter-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.75;
+    }
+    .converter-body { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.65fr); gap: 26px; }
+    .converter-source, #converterForm { min-width: 0; }
+    .image-drop {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      width: 100%;
+      min-height: 152px;
+      padding: 16px;
+      border: 1px dashed #cbbba9;
+      border-radius: 14px;
+      color: #a44616;
+      background: rgba(255, 247, 236, 0.65);
+      cursor: pointer;
+    }
+    .image-drop:hover, .image-drop.drag-over { border-color: var(--accent); background: #fff1dd; }
+    .image-drop strong { font-size: 13px; }
+    .image-drop > span { color: var(--muted); font-size: 11px; }
+    #sourcePreview {
+      display: grid;
+      width: 100%;
+      height: 110px;
+      place-items: center;
+      background: repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 / 16px 16px;
+      border-radius: 7px;
+      overflow: hidden;
+    }
+    #sourcePreview canvas { max-width: 100%; max-height: 110px; object-fit: contain; }
+    .source-select { display: block; margin-top: 12px; font-size: 12px; }
+    .source-select select { width: 100%; margin-top: 5px; }
+    #sourceInfo { margin-top: 8px; overflow-wrap: anywhere; }
+    .source-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+    .source-actions button { padding: 4px 0; border: 0; color: #a44616; background: none; font-size: 12px; cursor: pointer; }
+    .converter-options { margin: 0; padding: 0; border: 0; min-width: 0; }
+    .converter-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .converter-fields label { min-width: 0; color: #65584f; font-size: 12px; }
+    .converter-fields input, .source-select select {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--ink);
+      background: var(--paper);
+      font-size: 13px;
+    }
+    .converter-fields input { margin-top: 6px; }
+    .converter-checks { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 18px 0 12px; }
+    .converter-checks label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+    .converter-checks input { margin: 0; accent-color: var(--accent); }
+    .convert-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .convert-button {
+      padding: 10px 18px;
+      border: 1px solid var(--accent);
+      border-radius: 9px;
+      color: #fff;
+      background: var(--accent);
+      font-size: 13px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .convert-button.secondary { color: #a44616; background: transparent; border-color: var(--line); }
+    button:disabled, select:disabled { opacity: 0.5; cursor: default; }
+    #conversionStatus { min-height: 22px; margin-top: 12px; overflow-wrap: anywhere; }
+    #conversionStatus[data-error="true"] { color: #c92a2a; }
+    #conversionProgress { width: 100%; height: 6px; accent-color: var(--accent); }
+    .editor-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding: 9px 16px; border-top: 1px solid var(--night-line); }
+    #editorFilename { align-self: center; margin-right: auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(247, 239, 229, 0.55); font-size: 11px; }
+
+    @media (max-width: 720px) {
+      .converter-body { grid-template-columns: 1fr; gap: 20px; }
+      .converter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .image-converter { border-radius: 22px; }
+      .editor-panel .panel-head { flex-wrap: wrap; }
+    }
+
+    .empty-state {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 34px;
+      color: #a29486;
+      text-align: center;
+    }
+
+    .empty-icon {
+      display: grid;
+      width: 66px;
+      height: 66px;
+      margin-bottom: 4px;
+      place-items: center;
+      border: 1px dashed #d8cbbb;
+      border-radius: 22px;
+      color: #c27542;
+      background: #fff8ee;
+      font-family: Georgia, serif;
+      font-size: 28px;
+      font-style: italic;
+      transform: rotate(-4deg);
+    }
+
+    .empty-state strong {
+      color: #7f7063;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .empty-state span {
+      max-width: 260px;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .empty-state code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: #b8420b;
+      background: #fff3e2;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .cheatsheet {
+      margin-top: clamp(24px, 3vw, 36px);
+      padding: clamp(22px, 3vw, 36px);
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: var(--radius-xl);
+      background: rgba(255, 253, 248, 0.58);
+      box-shadow: 0 28px 70px -46px rgba(57, 39, 24, 0.42);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .cheat-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 22px;
+    }
+
+    .cheat-head h2 {
+      margin: 0;
+      font-size: clamp(22px, 3vw, 30px);
+      font-weight: 780;
+      letter-spacing: -0.035em;
+    }
+
+    .cheat-head h2 span {
+      margin-left: 7px;
+      color: #b9aa9b;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0;
+      vertical-align: middle;
+    }
+
+    .cheat-head p {
+      max-width: 440px;
+      margin: 0 0 4px;
+      color: #837568;
+      font-size: 12px;
+      line-height: 1.75;
+      text-align: right;
+    }
+
+    .cheat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .cheat-card {
+      display: flex;
+      min-width: 0;
+      min-height: 112px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 9px;
+      padding: 15px;
+      border: 1px solid rgba(89, 68, 50, 0.1);
+      border-radius: 14px;
+      background: rgba(255, 253, 248, 0.7);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 170ms ease, border-color 170ms ease, background 170ms ease, box-shadow 170ms ease;
+    }
+
+    .cheat-card:hover {
+      border-color: rgba(232, 89, 12, 0.28);
+      background: #fffdf8;
+      box-shadow: 0 14px 28px -22px rgba(89, 54, 22, 0.4);
+      transform: translateY(-2px);
+    }
+
+    .cheat-top {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .cheat-num {
+      color: #c1b3a4;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+
+    .cheat-add {
+      color: #c0b2a3;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      transition: color 170ms ease;
+    }
+
+    .cheat-card:hover .cheat-add {
+      color: var(--accent);
+    }
+
+    .cheat-card code {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      color: #b8420b;
+      font-family: "Cascadia Code", "Cascadia Mono", Consolas, monospace;
+      font-size: 10.5px;
+      line-height: 1.55;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .cheat-card strong {
+      color: #4e4238;
+      font-size: 12px;
+      font-weight: 650;
+      line-height: 1.4;
+    }
+
+    .cheat-card span.cheat-desc {
+      color: #95877c;
+      font-size: 10px;
+      line-height: 1.55;
+    }
+
+    .cheat-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 17px 0 0;
+      padding-top: 15px;
+      border-top: 1px solid rgba(89, 68, 50, 0.09);
+      color: #897b6e;
+      font-size: 11px;
+      line-height: 1.75;
+    }
+
+    .cheat-note::before {
+      flex: 0 0 auto;
+      color: #c27542;
+      content: "ⓘ";
+      font-size: 12px;
+    }
+
+    .cheat-note code {
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: #b8420b;
+      background: #fff3e2;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .site-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 22px 4px 0;
+      color: #94867a;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 9px;
+      letter-spacing: 0.06em;
+    }
+
+    .site-foot span:last-child {
+      text-align: right;
+    }
+
+    .toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 15px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      color: #fff;
+      background: rgba(27, 23, 20, 0.94);
+      box-shadow: 0 18px 40px -20px rgba(27, 23, 20, 0.65);
+      font-size: 11px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1080px) {
+      .hero {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .hero-copy {
+        max-width: 620px;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        height: min(640px, 72vh);
+      }
+
+      .cheat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        padding: 17px 12px 24px;
+      }
+
+      .site-header {
+        padding-bottom: 30px;
+      }
+
+      .header-note {
+        display: none;
+      }
+
+      .hero {
+        padding-bottom: 26px;
+      }
+
+      .hero h1 {
+        font-size: clamp(32px, 10vw, 48px);
+      }
+
+      .hero-copy {
+        font-size: 13px;
+      }
+
+      .panel {
+        height: 590px;
+        border-radius: 22px;
+      }
+
+      .panel-head {
+        min-height: 64px;
+        padding: 13px 15px;
+      }
+
+      .panel-title p {
+        display: none;
+      }
+
+      .toolbar {
+        padding: 8px 11px;
+      }
+
+      .divider {
+        margin: 0 2px;
+      }
+
+      #editor {
+        padding: 19px 16px 26px 22px;
+        font-size: 13px;
+      }
+
+      .editor-wrap::before {
+        left: 11px;
+      }
+
+      .panel-foot {
+        padding: 9px 15px;
+      }
+
+      .foot-hint {
+        display: none;
+      }
+
+      .mobile-jump {
+        display: inline-flex;
+      }
+
+      #preview-panel {
+        scroll-margin-top: 12px;
+      }
+
+      .paper-wrap {
+        padding: 12px;
+      }
+
+      .paper {
+        padding: 30px 24px;
+      }
+
+      .preview-content {
+        font-size: 16px;
+      }
+
+      .cheatsheet {
+        padding: 21px 16px;
+        border-radius: 22px;
+      }
+
+      .cheat-head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .cheat-head p {
+        max-width: none;
+        text-align: left;
+      }
+
+      .cheat-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .site-foot {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      .site-foot span:last-child {
+        text-align: left;
+      }
+
+      .toast {
+        right: 14px;
+        bottom: 14px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="富文本显示器首页">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <span class="brand-copy">
+          <strong>富文本显示器</strong>
+          <small>RICH TEXT DISPLAY</small>
+        </span>
+      </a>
+      <div class="header-note">
+        <span class="live-dot" aria-hidden="true"></span>
+        纯前端实时渲染 · 输入内容不会上传
+      </div>
+    </header>
+
+    <section class="hero" id="top">
+      <div>
+        <p class="eyebrow">Write tags. See them come alive.</p>
+        <h1>多功能富文本<br><em>标签工具网站</em></h1>
+      </div>
+      <p class="hero-copy">
+        在左侧输入带标签的文字，右侧会立刻呈现效果。例如
+        <code>&lt;color=red&gt;apple&lt;/color&gt;</code>
+        会得到 <span style="color:#e5484d;font-weight:700;">apple</span>。
+        支持颜色、字号、对齐、发光等十余种属性，也可以把图片转换为彩色方块组成的富文本。
+      </p>
+    </section>
+
+    <section class="image-converter" aria-labelledby="converter-title">
+      <div class="converter-heading">
+        <h2 id="converter-title">图片 → 富文本</h2>
+        <p>选择图片，生成可直接粘贴到 Unity / TextMeshPro 的彩色方块文字。转换在本地完成，结果会载入下方编辑器。</p>
+      </div>
+      <div class="converter-body">
+        <div class="converter-source">
+          <button class="image-drop" id="chooseImages" type="button">
+            <span id="sourcePreview" hidden></span>
+            <strong>选择或拖入图片</strong>
+            <span>支持 PNG / JPG / WebP / BMP / GIF，可多选</span>
+          </button>
+          <input id="imageFiles" type="file" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif,.png,.jpg,.jpeg,.webp,.bmp,.gif" multiple hidden>
+          <input id="imageFolder" type="file" webkitdirectory multiple hidden>
+          <label class="source-select">当前图片
+            <select id="imageList" disabled><option>尚未选择图片</option></select>
+          </label>
+          <p class="converter-hint" id="sourceInfo">可多次添加图片；动图只转换第一帧。</p>
+          <div class="source-actions">
+            <span class="converter-hint" id="fileSummary">0 张图片</span>
+            <button id="chooseFolder" type="button">添加文件夹</button>
+            <button id="clearImages" type="button" disabled>清空图片</button>
+          </div>
+        </div>
+        <form id="converterForm">
+          <fieldset class="converter-options" id="conversionOptions">
+            <legend class="converter-hint">转换设置</legend>
+            <div class="converter-fields">
+              <label>网格列数<input id="gridCols" name="cols" type="number" min="1" max="1024" step="1" value="70" required></label>
+              <label>网格行数<input id="gridRows" name="rows" type="number" min="1" max="1024" step="1" value="70" required></label>
+              <label>字号（%）<input id="outputSize" name="size" type="number" min="1" max="100" step="1" value="5" required></label>
+              <label>行高（%）<input id="outputLineHeight" name="lineheight" type="number" min="1" max="200" step="1" value="50" required></label>
+              <label>黑底阈值（0–255）<input id="backgroundThreshold" name="bg_th" type="number" min="0" max="255" step="1" value="64" required></label>
+              <label>上移格数<input id="outputOffset" name="voffset" type="number" min="0" max="9999" step="1" value="0" required></label>
+            </div>
+            <div class="converter-checks">
+              <label><input id="removeBackground" type="checkbox" checked>去除周围黑底</label>
+              <label><input id="streamColors" type="checkbox" checked>流式颜色标签</label>
+              <label><input id="preserveAlpha" type="checkbox" checked>保留图片透明区域</label>
+              <label><input id="keepAspect" type="checkbox">保持原图比例</label>
+            </div>
+          </fieldset>
+          <p class="converter-hint" id="gridHint">70 × 70 = 4,900 格。网格越大，细节越多，文字越长。</p>
+          <p class="converter-hint">字号、行高、上移会写入标签；下方预览按像素显示。关闭流式标签后，每段颜色独立闭合。</p>
+          <div class="convert-actions">
+            <button class="convert-button" id="convertImages" type="submit" disabled>转换并预览</button>
+            <button class="convert-button secondary" id="downloadBatch" type="button" hidden>下载全部 TXT（ZIP）</button>
+          </div>
+          <p class="converter-hint" id="conversionStatus" role="status" aria-live="polite">每个方块对应一个像素；去黑底只移除与边缘连通的深色区域。</p>
+          <progress id="conversionProgress" hidden></progress>
+        </form>
+      </div>
+    </section>
+
+    <main class="workspace" aria-label="富文本编辑器与实时预览">
+      <section class="panel editor-panel" aria-labelledby="editor-title">
+        <header class="panel-head">
+          <div class="panel-title">
+            <span class="panel-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m8 6-6 6 6 6M16 6l6 6-6 6" opacity=".55"/>
+                <path d="m14 4-4 16"/>
+              </svg>
+            </span>
+            <div>
+              <h2 id="editor-title">标签输入</h2>
+              <p>TYPE YOUR MARKUP</p>
+            </div>
+          </div>
+          <div class="head-actions">
+            <button class="ghost-button" id="importButton" type="button">导入 TXT</button>
+            <input id="textFile" type="file" accept=".txt,text/plain" hidden>
+            <button class="ghost-button" id="exampleButton" type="button">示例</button>
+            <button class="ghost-button" id="clearButton" type="button">清空</button>
+          </div>
+        </header>
+
+        <div class="toolbar" role="toolbar" aria-label="富文本格式工具">
+          <div class="tool-group" aria-label="编辑历史">
+            <button class="ghost-button" id="undoButton" type="button" title="撤销（Ctrl+Z / ⌘Z）" aria-keyshortcuts="Control+Z Meta+Z" disabled>↶ 撤销</button>
+            <button class="ghost-button" id="redoButton" type="button" title="重做（Ctrl+Y / Ctrl+Shift+Z / ⌘Shift+Z）" aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z" disabled>↷ 重做</button>
+          </div>
+          <span class="divider" aria-hidden="true"></span>
+          <div class="tool-group" aria-label="基础样式">
+            <button class="tool" type="button" data-tag="b" title="加粗（Ctrl+B）" aria-label="加粗"><b>B</b></button>
+            <button class="tool" type="button" data-tag="i" title="斜体（Ctrl+I）" aria-label="斜体"><i>I</i></button>
+            <button class="tool" type="button" data-tag="u" title="下划线（Ctrl+U）" aria-label="下划线">U</button>
+            <button class="tool" type="button" data-tag="s" title="删除线" aria-label="删除线">S</button>
+            <button class="tool symbol-tool" type="button" data-tag="mark" title="高亮" aria-label="高亮">▮</button>
+          </div>
+
+          <span class="divider" aria-hidden="true"></span>
+
+          <div class="color-group" aria-label="文字颜色">
+            <label class="custom-color" title="自定义文字颜色">
+              <input type="color" id="customColor" value="#e5484d" aria-label="自定义文字颜色">
+            </label>
+            <button class="ghost-button" id="textColorTable" type="button" aria-haspopup="dialog" aria-controls="colorTablePopup" aria-expanded="false">色表</button>
+            <button class="tool symbol-tool" id="saveCurrentColor" type="button" title="收藏当前颜色" aria-label="收藏当前颜色">☆</button>
+          </div>
+
+          <span class="divider" aria-hidden="true"></span>
+
+          <label class="select-wrap">
+            <span>字号</span>
+            <select id="sizeSelect" aria-label="选择字号">
+              <option value="">—</option>
+              <option value="12">12</option>
+              <option value="16">16</option>
+              <option value="20">20</option>
+              <option value="24">24</option>
+              <option value="32">32</option>
+              <option value="40">40</option>
+              <option value="56">56</option>
+              <option value="72">72</option>
+            </select>
+          </label>
+
+          <span class="divider" aria-hidden="true"></span>
+
+          <div class="tool-group" aria-label="更多效果">
+            <button class="tool symbol-tool" type="button" data-tag="align" data-value="center" title="整段居中" aria-label="居中">☰</button>
+            <button class="tool symbol-tool" type="button" data-tag="glow" data-value="#9c36b5" title="发光效果" aria-label="发光">✦</button>
+            <button class="tool symbol-tool" type="button" data-tag="gradient" title="应用当前渐变（可在下方渐变设置中选色）" aria-label="渐变">◒</button>
+          </div>
+        </div>
+
+        <div class="format-library">
+          <details class="style-library" id="colorLibrary" open>
+            <summary>常用颜色<span class="library-count" id="favoriteColorCount"></span><span class="library-count">点击展开 / 收起</span></summary>
+            <div class="library-body">
+              <div class="preset-list" id="favoriteColors" aria-label="常用颜色列表"></div>
+              <div class="library-form">
+                <input type="color" id="favoriteColorPicker" value="#e5484d" aria-label="要保存的颜色">
+                <button class="ghost-button" id="favoriteColorTable" type="button" aria-haspopup="dialog" aria-controls="colorTablePopup" aria-expanded="false">色表</button>
+                <input class="hex-input" id="favoriteColorHex" value="#E5484D" maxlength="7" aria-label="常用颜色 HEX 值" placeholder="#RRGGBB" spellcheck="false">
+                <input class="name-input" id="favoriteColorName" maxlength="24" aria-label="颜色名称（可选）" placeholder="名称（可选）">
+                <button class="ghost-button" id="saveFavoriteColor" type="button">保存颜色</button>
+              </div>
+              <p class="library-hint">选中文字后，点色块即可换色。工具栏选色后点 ☆ 可直接收藏。</p>
+            </div>
+          </details>
+          <details class="style-library" id="gradientLibrary">
+            <summary>渐变设置与预设<span class="library-count" id="gradientPresetCount"></span><span class="library-count">点击展开 / 收起</span></summary>
+            <div class="library-body gradient-scroll">
+              <div class="preset-list" id="gradientPresets" aria-label="渐变预设列表"></div>
+              <div class="gradient-stops" id="gradientStops" aria-label="渐变颜色"></div>
+              <div class="gradient-controls">
+                <button class="ghost-button" id="addGradientStop" type="button">＋ 色点</button>
+                <button class="ghost-button" id="reverseGradient" type="button">反转颜色</button>
+                <label>输出<select id="gradientMode" aria-label="渐变输出方式">
+                  <option value="tag">&lt;gradient&gt; 标签</option>
+                  <option value="characters">逐字 &lt;color&gt;</option>
+                </select></label>
+              </div>
+              <div class="gradient-demo" id="gradientDemo" aria-label="当前渐变效果"></div>
+            </div>
+            <div class="library-body gradient-footer">
+              <div class="gradient-actions">
+                <button class="ghost-button apply-paint" id="applyGradient" type="button">应用渐变</button>
+                <input class="name-input" id="gradientPresetName" maxlength="24" placeholder="预设名称（可选）" aria-label="渐变预设名称">
+                <button class="ghost-button" id="saveGradientPreset" type="button">保存预设</button>
+              </div>
+              <p class="library-hint">点预设直接应用；「调色」只载入设置。同名预设会更新，颜色和输出方式一起保存。逐字渐变保留换行及其他格式。</p>
+            </div>
+          </details>
+          <p class="library-notice" id="paintNotice" role="status" aria-live="polite" hidden></p>
+        </div>
+
+        <div class="editor-wrap">
+          <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="富文本标签输入框"></textarea>
+        </div>
+
+        <div class="editor-actions">
+          <span id="editorFilename">richtext.txt</span>
+          <button class="ghost-button" id="copyText" type="button">复制富文本</button>
+          <button class="ghost-button" id="downloadText" type="button">下载 TXT</button>
+        </div>
+
+        <footer class="panel-foot">
+          <span class="counter" id="charCount">0 字符</span>
+          <span class="foot-right">
+            <span class="foot-hint"><kbd>Ctrl</kbd> + <kbd>Z</kbd> 撤销 · <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> 重做</span>
+            <a class="mobile-jump" href="#preview-panel">查看预览 ↓</a>
+          </span>
+        </footer>
+      </section>
+
+      <section class="panel preview-panel" id="preview-panel" aria-labelledby="preview-title">
+        <header class="panel-head">
+          <div class="panel-title">
+            <span class="panel-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </span>
+            <div>
+              <h2 id="preview-title">实时预览</h2>
+              <p>LIVE RENDER</p>
+            </div>
+          </div>
+          <span class="status-pill">LIVE</span>
+        </header>
+
+        <div class="image-tools">
+          <label>预览 <select id="renderMode" aria-label="预览模式">
+            <option value="auto">自动识别</option>
+            <option value="text">富文本</option>
+            <option value="pixel">像素图</option>
+          </select></label>
+          <label id="zoomControl" hidden>缩放 <select id="pixelZoom" aria-label="像素图缩放">
+            <option value="fit">适应宽度</option>
+            <option value="1">1 倍</option>
+            <option value="4">4 倍</option>
+            <option value="8">8 倍</option>
+            <option value="12">12 倍</option>
+          </select></label>
+          <button id="exportImage" type="button" hidden>导出 PNG</button>
+          <span id="imageInfo" role="status" aria-live="polite"></span>
+        </div>
+
+        <div class="paper-wrap" id="paperWrap">
+          <div class="paper">
+            <div class="preview-content" id="preview" aria-label="富文本渲染结果"></div>
+            <div class="empty-state" id="emptyState">
+              <span class="empty-icon" aria-hidden="true">Aa</span>
+              <strong>还差一点文字</strong>
+              <span>在左侧输入内容，或试试 <code>&lt;color=red&gt;apple&lt;/color&gt;</code></span>
+            </div>
+          </div>
+        </div>
+
+        <footer class="panel-foot">
+          <span class="counter" id="tagCount">0 个标签</span>
+          <span class="safe-badge">白名单渲染 · 标签不会执行</span>
+        </footer>
+      </section>
+    </main>
+
+    <section class="cheatsheet" aria-labelledby="cheatsheet-title">
+      <div class="cheat-head">
+        <div>
+          <p class="eyebrow">Cheat sheet</p>
+          <h2 id="cheatsheet-title">标签速查<span>点击即可插入</span></h2>
+        </div>
+        <p>标签用 <code>&lt;name=value&gt;</code> 打开、<code>&lt;/name&gt;</code> 关闭。支持任意嵌套，写错了也不会破坏页面。</p>
+      </div>
+
+      <div class="cheat-grid">
+        <button class="cheat-card" type="button" data-demo="color">
+          <span class="cheat-top"><span class="cheat-num">01 / COLOR</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;color=red&gt;apple&lt;/color&gt;</code>
+          <strong>文字颜色</strong>
+          <span class="cheat-desc">支持颜色名、HEX、rgb() 等 CSS 颜色值</span>
+        </button>
+
+        <button class="cheat-card" type="button" data-demo="size">
+          <span class="cheat-top"><span class="cheat-num">02 / SIZE</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;size=32&gt;大号文字&lt;/size&gt;</code>
+          <strong>字号大小</strong>
+          <span class="cheat-desc">支持 8–160 px，也支持 &lt;size=5%&gt; 百分比字号</span>
+        </button>
+
+        <button class="cheat-card" type="button" data-demo="background">
+          <span class="cheat-top"><span class="cheat-num">03 / BACKGROUND</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;bgcolor=#fff3bf&gt;高亮&lt;/bgcolor&gt;</code>
+          <strong>文字背景</strong>
+          <span class="cheat-desc">也可以用 &lt;bg&gt; 简写，颜色规则与 color 相同</span>
+        </button>
+
+        <button class="cheat-card" type="button" data-demo="style">
+          <span class="cheat-top"><span class="cheat-num">04 / STYLE</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;b&gt;粗&lt;/b&gt; &lt;i&gt;斜&lt;/i&gt; &lt;u&gt;线&lt;/u&gt;</code>
+          <strong>基础样式</strong>
+          <span class="cheat-desc">加粗、斜体、下划线、删除线、高亮、行内代码</span>
+        </button>
+
+        <button class="cheat-card" type="button" data-demo="align">
+          <span class="cheat-top"><span class="cheat-num">05 / ALIGN</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;align=center&gt;居中显示&lt;/align&gt;</code>
+          <strong>段落对齐</strong>
+          <span class="cheat-desc">left / center / right / justify，&lt;center&gt; 是简写</span>
+        </button>
+
+        <button class="cheat-card" type="button" data-demo="effect">
+          <span class="cheat-top"><span class="cheat-num">06 / EFFECT</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;glow=#9c36b5&gt;发光&lt;/glow&gt;</code>
+          <strong>光影特效</strong>
+          <span class="cheat-desc">glow 发光、shadow 投影、outline 描边</span>
+        </button>
+
+        <button class="cheat-card" type="button" data-demo="gradient">
+          <span class="cheat-top"><span class="cheat-num">07 / GRADIENT</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;gradient=#f08c00,#e5484d&gt;渐变&lt;/gradient&gt;</code>
+          <strong>渐变文字</strong>
+          <span class="cheat-desc">用逗号分隔多个颜色，至少提供两种效果更好</span>
+        </button>
+
+        <button class="cheat-card" type="button" data-demo="misc">
+          <span class="cheat-top"><span class="cheat-num">08 / MORE</span><span class="cheat-add">+ 插入</span></span>
+          <code>&lt;sup&gt;上标&lt;/sup&gt; · &lt;sub&gt;下标&lt;/sub&gt;</code>
+          <strong>上下标与换行</strong>
+          <span class="cheat-desc">还有 sup / sub / br / font；直接回车也会保留换行</span>
+        </button>
+      </div>
+
+      <p class="cheat-note">
+        安全说明：解析器只识别白名单标签，所有普通文本都会作为纯文本插入页面。像
+        <code>&lt;script&gt;</code> 这样的未知标签会原样显示，不会被浏览器执行。属性值里需要空格时，请使用引号，例如
+        <code>&lt;font="Times New Roman"&gt;Hello&lt;/font&gt;</code>。
+      </p>
+    </section>
+
+    <footer class="site-foot">
+      <span>RICH TEXT DISPLAY · SINGLE FILE · NO DEPENDENCIES</span>
+      <span>输入即所见 · 内容只留在你的浏览器里</span>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="color-table-popup" id="colorTablePopup" role="dialog" aria-labelledby="colorTableTitle" aria-describedby="colorTableHint" hidden>
+    <div class="color-table-head">
+      <strong id="colorTableTitle">文字颜色色表</strong>
+      <button class="ghost-button" id="closeColorTable" type="button" aria-label="关闭色表">×</button>
+    </div>
+    <div class="color-table-grid" id="colorTableGrid" role="group" aria-label="预设颜色色表"></div>
+    <div class="color-table-info"><span id="colorTableSwatch" aria-hidden="true"></span><span id="colorTableValue"></span></div>
+    <p id="colorTableHint">点击色块即可选色。</p>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const editor = document.getElementById("editor");
+      const preview = document.getElementById("preview");
+      const emptyState = document.getElementById("emptyState");
+      const charCount = document.getElementById("charCount");
+      const tagCount = document.getElementById("tagCount");
+      const paperWrap = document.getElementById("paperWrap");
+      const sizeSelect = document.getElementById("sizeSelect");
+      const customColor = document.getElementById("customColor");
+      const toast = document.getElementById("toast");
+
+      const DEFAULT_TEXT = [
+        '<align=center><size=38><gradient=#f08c00,#e5484d,#9c36b5>富文本显示器</gradient></size></align>',
+        '<align=center><size=14><color=#8a7f74>输入标签，实时看到它变成什么样子</color></size></align>',
+        '',
+        '<color=red>apple</color>　<color=green>kiwi</color>　<color=#1c7ed6>blueberry</color>',
+        '<size=28>大号文字</size>　<size=13>小号文字</size>',
+        '<b>加粗</b>　<i>斜体</i>　<u>下划线</u>　<s>删除线</s>　<mark>荧光高亮</mark>',
+        '',
+        '<align=center><color=#9c36b5>✦ <glow=#9c36b5>发光</glow>　<shadow=#b9aa9b>阴影</shadow>　<outline=#201a17>描边</outline> ✦</color></align>',
+        '<align=right><size=12><color=#95877c>—— 点击右侧标签速查，可以快速插入示例</color></size></align>'
+      ].join("\n");
+
+      const DEMOS = {
+        color: '<color=red>apple</color>',
+        size: '<size=32>大号文字</size>',
+        background: '<bgcolor=#fff3bf>荧光笔高亮</bgcolor>',
+        style: '<b>加粗</b> · <i>斜体</i> · <u>下划线</u> · <s>删除线</s> · <mark>高亮</mark>',
+        align: '<align=center>这一行会居中显示</align>',
+        effect: '<glow=#9c36b5>发光</glow> · <shadow=#8a7f74>阴影</shadow> · <outline=#201a17>描边</outline>',
+        gradient: '<gradient=#f08c00,#e5484d,#9c36b5>渐变文字</gradient>',
+        misc: '<size=20>H<sub>2</sub>O</size> · <size=20>x<sup>2</sup></size>'
+      };
+
+      const TAG_ALIASES = {
+        bold: "b",
+        strong: "b",
+        italic: "i",
+        em: "i",
+        strike: "s",
+        del: "s",
+        highlight: "mark",
+        bg: "bgcolor",
+        background: "bgcolor",
+        colour: "color",
+        textcolor: "color",
+        family: "font",
+        "font-size": "size",
+        center: "align"
+      };
+
+      const TAG_DEFS = {
+        color: {
+          make(value) {
+            return styledSpan({ color: safeColor(value, "#e5484d") });
+          }
+        },
+        bgcolor: {
+          make(value) {
+            return styledSpan({
+              backgroundColor: safeColor(value, "#ffe8a1"),
+              boxDecorationBreak: "clone",
+              webkitBoxDecorationBreak: "clone",
+              padding: "0.02em 0.16em",
+              borderRadius: "0.18em"
+            });
+          }
+        },
+        size: {
+          make(value) {
+            if (/^\d+(?:\.\d+)?%$/.test(value)) {
+              return styledSpan({ fontSize: Math.min(1000, Math.max(1, parseFloat(value))) + "%" });
+            }
+            return styledSpan({ fontSize: parseSize(value) + "px" });
+          }
+        },
+        "line-height": {
+          make(value) {
+            const match = String(value).match(/^(\d+(?:\.\d+)?)(%|px)?$/i);
+            const height = match ? Math.min(1000, Math.max(0.01, Number(match[1]))) : 1.9;
+            return styledSpan({ lineHeight: height + (match ? match[2] || "" : "") });
+          }
+        },
+        voffset: {
+          make(value) {
+            const match = String(value).match(/^(-?\d+(?:\.\d+)?)(em|px)$/i);
+            return styledSpan({ verticalAlign: match ? Math.min(10000, Math.max(-10000, Number(match[1]))) + match[2] : "baseline" });
+          }
+        },
+        font: {
+          make(value) {
+            const family = safeFont(value);
+            return family ? styledSpan({ fontFamily: family }) : document.createElement("span");
+          }
+        },
+        b: {
+          make() {
+            return styledSpan({ fontWeight: "800" });
+          }
+        },
+        i: {
+          make() {
+            return styledSpan({ fontStyle: "italic" });
+          }
+        },
+        u: {
+          make() {
+            return styledSpan({
+              textDecoration: "underline",
+              textDecorationThickness: "1.5px",
+              textUnderlineOffset: "0.16em"
+            });
+          }
+        },
+        s: {
+          make() {
+            return styledSpan({
+              textDecoration: "line-through",
+              textDecorationThickness: "1.5px"
+            });
+          }
+        },
+        mark: {
+          make() {
+            return styledSpan({
+              backgroundColor: "#ffe066",
+              boxDecorationBreak: "clone",
+              webkitBoxDecorationBreak: "clone",
+              padding: "0.02em 0.14em",
+              borderRadius: "0.16em"
+            });
+          }
+        },
+        code: {
+          make() {
+            return styledSpan({
+              fontFamily: '"Cascadia Code", Consolas, monospace',
+              fontSize: "0.88em",
+              padding: "0.1em 0.38em",
+              borderRadius: "0.28em",
+              border: "1px solid rgba(36, 30, 26, 0.1)",
+              backgroundColor: "rgba(89, 68, 50, 0.07)"
+            });
+          }
+        },
+        sup: {
+          make() {
+            return styledSpan({
+              fontSize: "0.72em",
+              verticalAlign: "super",
+              lineHeight: "0"
+            });
+          }
+        },
+        sub: {
+          make() {
+            return styledSpan({
+              fontSize: "0.72em",
+              verticalAlign: "sub",
+              lineHeight: "0"
+            });
+          }
+        },
+        align: {
+          make(value) {
+            const allowed = ["left", "center", "right", "justify"];
+            const direction = String(value || "").trim().toLowerCase();
+            const node = styledSpan({
+              display: "block",
+              width: "100%",
+              textAlign: allowed.includes(direction) ? direction : "center"
+            });
+            return node;
+          }
+        },
+        glow: {
+          make(value) {
+            const glowColor = safeColor(value, "#9c36b5");
+            return styledSpan({
+              textShadow: "0 0 6px " + glowColor + ", 0 0 18px " + glowColor
+            });
+          }
+        },
+        shadow: {
+          make(value) {
+            const shadowColor = safeColor(value, "#8a7f74");
+            return styledSpan({ textShadow: "0.08em 0.1em 0.02em " + shadowColor });
+          }
+        },
+        outline: {
+          make(value) {
+            return styledSpan({
+              webkitTextStroke: "1.15px " + safeColor(value, "#201a17")
+            });
+          }
+        },
+        gradient: {
+          make(value) {
+            const candidates = String(value || "")
+              .split(/[,，]/)
+              .map((part) => part.trim())
+              .filter(Boolean);
+            const colors = candidates.map((part) => safeColor(part, "")).filter(Boolean);
+            if (colors.length === 0) {
+              colors.push("#f08c00", "#e5484d");
+            } else if (colors.length === 1) {
+              colors.push(colors[0]);
+            }
+            return styledSpan({
+              display: "inline-block",
+              backgroundImage: "linear-gradient(90deg, " + colors.join(", ") + ")",
+              webkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent"
+            });
+          }
+        },
+        br: {
+          void: true,
+          make() {
+            return document.createElement("br");
+          }
+        }
+      };
+
+      const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^<>]*?)))?\s*>/g;
+      const COLOR_FORBIDDEN = /[;{}<>"'\\\r\n]/;
+      const FONT_FORBIDDEN = /[;{}<>\\\r\n]/;
+
+      let renderFrame = 0;
+      let toastTimer = 0;
+
+      function styledSpan(styles) {
+        const node = document.createElement("span");
+        for (const [property, value] of Object.entries(styles)) {
+          if (property === "webkitTextStroke") {
+            node.style.webkitTextStroke = value;
+          } else if (property === "webkitBackgroundClip") {
+            node.style.webkitBackgroundClip = value;
+          } else {
+            node.style[property] = value;
+          }
+        }
+        return node;
+      }
+
+      function safeColor(raw, fallback) {
+        const value = String(raw == null ? "" : raw).trim();
+        if (!value || value.length > 90 || COLOR_FORBIDDEN.test(value)) {
+          return fallback;
+        }
+        try {
+          return CSS.supports("color", value) ? value : fallback;
+        } catch (error) {
+          return fallback;
+        }
+      }
+
+      function safeFont(raw) {
+        const value = String(raw == null ? "" : raw).trim();
+        if (!value || value.length > 90 || FONT_FORBIDDEN.test(value)) {
+          return "";
+        }
+        try {
+          return CSS.supports("font-family", value) ? value : "";
+        } catch (error) {
+          return "";
+        }
+      }
+
+      function parseSize(raw) {
+        const value = String(raw == null ? "" : raw).trim();
+        const match = value.match(/^(\d+(?:\.\d+)?)\s*(?:px)?$/i);
+        if (!match) {
+          return 24;
+        }
+        return Math.min(160, Math.max(8, Number(match[1])));
+      }
+
+      function appendText(text, parent) {
+        if (text) {
+          parent.appendChild(document.createTextNode(text));
+        }
+      }
+
+      function renderRichText(source, root) {
+        root.replaceChildren();
+
+        const stack = [];
+        let current = root;
+        let lastIndex = 0;
+        let tagTotal = 0;
+        let unknownTotal = 0;
+        let match;
+
+        TAG_RE.lastIndex = 0;
+
+        while ((match = TAG_RE.exec(source)) !== null) {
+          const raw = match[0];
+          const isClosing = Boolean(match[1]);
+          const name = match[2].toLowerCase();
+          const canonical = TAG_ALIASES[name] || name;
+          const definition = TAG_DEFS[canonical];
+
+          appendText(source.slice(lastIndex, match.index), current);
+          lastIndex = TAG_RE.lastIndex;
+
+          if (!definition) {
+            appendText(raw, current);
+            unknownTotal += 1;
+            continue;
+          }
+
+          if (isClosing) {
+            if (definition.void) {
+              continue;
+            }
+            let stackIndex = -1;
+            for (let index = stack.length - 1; index >= 0; index -= 1) {
+              if (stack[index].canonical === canonical) {
+                stackIndex = index;
+                break;
+              }
+            }
+            if (stackIndex === -1) {
+              continue;
+            }
+            stack.length = stackIndex;
+            current = stack.length > 0 ? stack[stack.length - 1].el : root;
+            continue;
+          }
+
+          const quoted = match[3] != null ? match[3] : match[4];
+          let value = quoted != null ? quoted : (match[5] || "");
+          value = value.trim();
+
+          if (canonical === "align" && (name === "center" || !value)) {
+            value = "center";
+          }
+
+          const node = definition.make(value);
+          if (!definition.void) {
+            node.dataset.tag = canonical;
+          }
+          current.appendChild(node);
+          tagTotal += 1;
+
+          if (!definition.void) {
+            stack.push({ canonical, el: node });
+            current = node;
+          }
+        }
+
+        appendText(source.slice(lastIndex), current);
+
+        return { tags: tagTotal, unknown: unknownTotal };
+      }
+
+      function render() {
+        const source = editor.value;
+        const mode = document.getElementById("renderMode").value;
+        const pixels = mode === "text" ? null : parsePixelArt(source);
+        preview.classList.toggle("pixel-preview", Boolean(pixels));
+        document.getElementById("zoomControl").hidden = !pixels;
+        document.getElementById("exportImage").hidden = !pixels;
+        document.getElementById("imageInfo").textContent = pixels
+          ? pixels.width + " × " + pixels.rows.length + " 像素"
+          : mode === "pixel" ? "请输入由颜色标签和 █ / ■ 方块组成的像素图" : "";
+        const stats = pixels ? renderPixelArt(pixels) : renderRichText(source, preview);
+        let count = 0;
+        for (const char of source) count += 1;
+
+        charCount.textContent = count.toLocaleString("zh-CN") + " 字符";
+
+        let tagLabel = stats.tags.toLocaleString("zh-CN") + " 个标签";
+        if (stats.unknown > 0) {
+          tagLabel += " · " + stats.unknown + " 个未识别";
+        }
+        tagCount.textContent = tagLabel;
+
+        const hasVisibleContent = Boolean(pixels) || preview.textContent.trim().length > 0 || preview.querySelector("br") !== null;
+        emptyState.hidden = hasVisibleContent;
+        document.getElementById("copyText").disabled = !source;
+        document.getElementById("downloadText").disabled = !source;
+        paperWrap.scrollTop = 0;
+      }
+
+      // Parse block art separately so thousands of unclosed color switches do not
+      // become thousands of nested DOM elements. Each block is exactly one pixel.
+      function parsePixelArt(source) {
+        const rows = [[]];
+        const colors = ["#2a211b"];
+        let tags = 0;
+        let blocks = 0;
+        let lastIndex = 0;
+        let valid = true;
+        const colorCache = new Map();
+        const token = /<(\/?)(color|colour|textcolor|size|line-height|voffset|br)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^<>]*?)))?\s*>/gi;
+        function addText(text) {
+          for (const char of text.replace(/\r\n?/g, "\n")) {
+            if (char === "\n") rows.push([]);
+            else if (char === "█" || char === "■" || char === " " || char === "\u00a0") {
+              rows[rows.length - 1].push(char === " " || char === "\u00a0" ? null : colors[colors.length - 1]);
+              if (char === "█" || char === "■") blocks += 1;
+            } else if (char !== "\ufeff") valid = false;
+          }
+        }
+        let match;
+        while ((match = token.exec(source)) !== null) {
+          addText(source.slice(lastIndex, match.index));
+          lastIndex = token.lastIndex;
+          const name = match[2].toLowerCase();
+          if (!match[1]) tags += 1;
+          if (["color", "colour", "textcolor"].includes(name)) {
+            if (match[1]) { if (colors.length > 1) colors.pop(); }
+            else {
+              const rawColor = match[3] ?? match[4] ?? match[5];
+              if (!colorCache.has(rawColor)) colorCache.set(rawColor, safeColor(rawColor, "#e5484d"));
+              colors.push(colorCache.get(rawColor));
+            }
+          } else if (name === "br" && !match[1]) rows.push([]);
+        }
+        addText(source.slice(lastIndex));
+        while (rows.length && !rows[0].length) rows.shift();
+        while (rows.length && !rows[rows.length - 1].length) rows.pop();
+        let width = 0;
+        for (const row of rows) width = Math.max(width, row.length);
+        // Bound canvas allocation; unsupported content remains safely rendered as text.
+        if (!valid || !blocks || width > 8192 || rows.length > 8192 || width * rows.length > 16777216) return null;
+        return { rows, width, tags };
+      }
+
+      function renderPixelArt(pixels) {
+        const canvas = document.createElement("canvas");
+        canvas.width = pixels.width;
+        canvas.height = pixels.rows.length;
+        canvas.setAttribute("role", "img");
+        canvas.setAttribute("aria-label", "富文本像素图，" + canvas.width + " 列，" + canvas.height + " 行");
+        const context = canvas.getContext("2d");
+        pixels.rows.forEach((row, y) => row.forEach((color, x) => {
+          if (color !== null) {
+            context.fillStyle = color;
+            context.fillRect(x, y, 1, 1);
+          }
+        }));
+        preview.replaceChildren(canvas);
+        updatePixelZoom();
+        return { tags: pixels.tags, unknown: 0 };
+      }
+
+      function updatePixelZoom() {
+        const canvas = preview.querySelector("canvas");
+        if (!canvas) return;
+        const zoom = document.getElementById("pixelZoom").value;
+        canvas.classList.toggle("pixel-zoom", zoom !== "fit");
+        canvas.style.width = zoom === "fit" ? "100%" : canvas.width * Number(zoom) + "px";
+      }
+
+      document.getElementById("renderMode").addEventListener("change", render);
+      document.getElementById("pixelZoom").addEventListener("change", updatePixelZoom);
+      document.getElementById("importButton").addEventListener("click", () => document.getElementById("textFile").click());
+      document.getElementById("textFile").addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          editEditor(() => {
+            editor.value = text;
+            setOutputFilename(file.name.replace(/\.[^.]+$/, "") + ".txt");
+            document.getElementById("renderMode").value = "auto";
+          });
+          render();
+          showToast("已导入 " + file.name);
+        } catch (error) { showToast("文件读取失败，请重新选择"); }
+        event.target.value = "";
+      });
+      document.getElementById("exportImage").addEventListener("click", () => {
+        const canvas = preview.querySelector("canvas");
+        if (!canvas) return;
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "richtext-pixels.png";
+          link.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, "image/png");
+      });
+
+      function scheduleRender() {
+        if (renderFrame) {
+          return;
+        }
+        renderFrame = window.requestAnimationFrame(() => {
+          renderFrame = 0;
+          render();
+        });
+      }
+
+      function showToast(message) {
+        window.clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("show");
+        toastTimer = window.setTimeout(() => {
+          toast.classList.remove("show");
+        }, 1600);
+      }
+
+      // Browser port of img2richtext.py. Files stay in memory; no server or Python
+      // runtime is required. The default parameters match img2richtext_config.json.
+      const converter = Object.fromEntries([
+        "imageFiles", "imageFolder", "chooseImages", "chooseFolder", "imageList", "sourcePreview", "sourceInfo",
+        "fileSummary", "clearImages", "converterForm", "conversionOptions", "gridCols", "gridRows",
+        "outputSize", "outputLineHeight", "backgroundThreshold", "outputOffset", "removeBackground",
+        "streamColors", "preserveAlpha", "keepAspect", "gridHint", "convertImages", "downloadBatch",
+        "conversionStatus", "conversionProgress"
+      ].map((id) => [id, document.getElementById(id)]));
+      const optionNumbers = ["gridCols", "gridRows", "outputSize", "outputLineHeight", "backgroundThreshold", "outputOffset"];
+      const optionChecks = ["removeBackground", "streamColors", "preserveAlpha", "keepAspect"];
+      const settingsKey = "richtext-image-converter-v1";
+      let imageEntries = [];
+      let converting = false;
+      let previewRequest = 0;
+      let outputFilename = "richtext.txt";
+      const yieldTask = () => new Promise((resolve) => window.setTimeout(resolve, 0));
+
+      function setOutputFilename(name) {
+        outputFilename = name.replace(/[\\/:*?"<>|\x00-\x1f]/g, "_") || "richtext.txt";
+        document.getElementById("editorFilename").textContent = outputFilename;
+      }
+
+      function conversionMessage(message, isError = false) {
+        converter.conversionStatus.textContent = message;
+        converter.conversionStatus.dataset.error = String(isError);
+      }
+
+      function selectedImage() {
+        return imageEntries[Number(converter.imageList.value)];
+      }
+
+      function refreshImageList(selected = Number(converter.imageList.value) || 0) {
+        converter.imageList.replaceChildren();
+        if (!imageEntries.length) converter.imageList.add(new Option("尚未选择图片", ""));
+        imageEntries.forEach((entry, index) => {
+          const state = entry.result ? " · 已转换" : entry.error ? " · 转换失败" : "";
+          converter.imageList.add(new Option(entry.file.name + state, String(index)));
+        });
+        converter.imageList.value = String(selected);
+        converter.fileSummary.textContent = imageEntries.length + " 张图片 · " + imageEntries.filter((entry) => entry.result).length + " 张已转换";
+        converter.imageList.disabled = converting || !imageEntries.length;
+        converter.clearImages.disabled = converting || !imageEntries.length;
+        converter.convertImages.disabled = converting || !imageEntries.length;
+        converter.convertImages.textContent = converting ? "正在转换…" : imageEntries.length > 1 ? "转换全部并预览" : "转换并预览";
+        converter.downloadBatch.hidden = !imageEntries.some((entry) => entry.result);
+        converter.downloadBatch.disabled = converting;
+      }
+
+      function updateGridHint() {
+        const entry = selectedImage();
+        if (converter.keepAspect.checked && entry && entry.width) {
+          const cols = Number(converter.gridCols.value);
+          if (Number.isInteger(cols) && cols > 0) converter.gridRows.value = Math.max(1, Math.round(cols * entry.height / entry.width));
+        }
+        converter.gridRows.readOnly = converter.keepAspect.checked;
+        const cols = Number(converter.gridCols.value), rows = Number(converter.gridRows.value);
+        converter.gridHint.textContent = cols > 0 && rows > 0
+          ? cols + " × " + rows + " = " + (cols * rows).toLocaleString("zh-CN") + " 格。每边最多 1,024 格；网格越大，文字越长。" + (converter.keepAspect.checked ? " 批量转换会按每张原图比例计算行数。" : "")
+          : "请输入有效的网格行数和列数。";
+      }
+
+      async function showSelectedImage(loadResult = true) {
+        const entry = selectedImage();
+        const request = ++previewRequest;
+        converter.sourcePreview.replaceChildren();
+        converter.sourcePreview.hidden = true;
+        if (!entry) return;
+        converter.sourceInfo.textContent = "正在读取 " + entry.file.name;
+        if (loadResult && entry.result) {
+          editEditor(() => {
+            editor.value = entry.result.text;
+            setOutputFilename(entry.outputName);
+            document.getElementById("renderMode").value = "auto";
+          });
+          render();
+          conversionMessage(entry.result.cols + " × " + entry.result.rows + " 格 · " + entry.result.text.length.toLocaleString("zh-CN") + " 字符。可复制或下载下方文本；ZIP 保存各图片的转换结果。");
+        } else if (loadResult) {
+          conversionMessage(entry.error || "当前图片尚未转换，点击「转换并预览」生成文字。", Boolean(entry.error));
+        }
+        let bitmap;
+        try {
+          bitmap = await createImageBitmap(entry.file);
+          if (request !== previewRequest) return;
+          entry.width = bitmap.width;
+          entry.height = bitmap.height;
+          const scale = Math.min(320 / bitmap.width, 110 / bitmap.height, 1);
+          const thumb = document.createElement("canvas");
+          thumb.width = Math.max(1, Math.round(bitmap.width * scale));
+          thumb.height = Math.max(1, Math.round(bitmap.height * scale));
+          thumb.setAttribute("role", "img");
+          thumb.setAttribute("aria-label", entry.file.name + " 原图");
+          thumb.getContext("2d").drawImage(bitmap, 0, 0, thumb.width, thumb.height);
+          converter.sourcePreview.replaceChildren(thumb);
+          converter.sourcePreview.hidden = false;
+          converter.sourceInfo.textContent = entry.file.name + " · " + bitmap.width + " × " + bitmap.height + " px";
+          updateGridHint();
+        } catch (error) {
+          if (request === previewRequest) converter.sourceInfo.textContent = "无法读取图片，请检查文件是否完整且格式受浏览器支持。";
+        } finally {
+          if (bitmap) bitmap.close();
+        }
+      }
+
+      function addImageFiles(files) {
+        if (converting) return;
+        const previousCount = imageEntries.length;
+        const names = new Set(imageEntries.map((entry) => entry.outputName.toLowerCase()));
+        let skipped = 0;
+        for (const file of files) {
+          if (!/\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name)) { skipped += 1; continue; }
+          if (imageEntries.some((entry) => entry.file.name === file.name && entry.file.size === file.size && entry.file.lastModified === file.lastModified && entry.file.webkitRelativePath === file.webkitRelativePath)) continue;
+          const base = file.name.replace(/\.[^.]+$/, "").replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").replace(/[. ]+$/, "") || "image";
+          let name = base + ".txt", suffix = 2;
+          while (names.has(name.toLowerCase())) name = base + " (" + suffix++ + ").txt";
+          names.add(name.toLowerCase());
+          imageEntries.push({ file, outputName: name, result: null, error: "" });
+        }
+        refreshImageList(previousCount < imageEntries.length ? previousCount : Math.max(0, Number(converter.imageList.value)));
+        if (imageEntries.length) showSelectedImage(false);
+        conversionMessage("已添加 " + (imageEntries.length - previousCount) + " 张图片。" + (skipped ? " 已跳过 " + skipped + " 个非支持格式文件。" : " 调整设置后开始转换。"));
+      }
+
+      // A separable triangle filter with widened support when reducing an image.
+      // Round each pass to 8 bits, as the desktop converter's RGB bilinear resize does.
+      function bilinearWeights(sourceLength, targetLength) {
+        const scale = sourceLength / targetLength, support = Math.max(1, scale), precision = 4194304;
+        return Array.from({ length: targetLength }, (_, index) => {
+          const center = (index + 0.5) * scale;
+          const start = Math.max(0, Math.floor(center - support + 0.5));
+          const end = Math.min(sourceLength, Math.floor(center + support + 0.5));
+          const weights = [];
+          let total = 0;
+          for (let sample = start; sample < end; sample += 1) {
+            const weight = Math.max(0, 1 - Math.abs((sample + 0.5 - center) / support));
+            weights.push(weight);
+            total += weight;
+          }
+          return { start, weights: weights.map((weight) => Math.round(weight / total * precision)) };
+        });
+      }
+
+      async function sampleImage(bitmap, cols, rows, preserveAlpha) {
+        if (bitmap.width * bitmap.height > 40000000 || cols * bitmap.height > 40000000) throw new Error("原图过大，请缩小后重试（最多 4,000 万像素）。");
+        const canvas = document.createElement("canvas");
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        context.drawImage(bitmap, 0, 0);
+        const source = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        canvas.width = canvas.height = 1;
+        // Premultiply for alpha-aware resizing to avoid dark fringes at transparent edges.
+        for (let i = 0; i < source.length; i += 4) {
+          if (preserveAlpha) {
+            for (let channel = 0; channel < 3; channel += 1) source[i + channel] = Math.round(source[i + channel] * source[i + 3] / 255);
+          } else source[i + 3] = 255;
+        }
+        const roundByte = (value) => Math.max(0, Math.min(255, Math.floor((value + 2097152) / 4194304)));
+        let horizontal = source;
+        if (cols !== bitmap.width) {
+          const weightsX = bilinearWeights(bitmap.width, cols);
+          horizontal = new Uint8Array(cols * bitmap.height * 4);
+          for (let y = 0; y < bitmap.height; y += 1) {
+            for (let x = 0; x < cols; x += 1) {
+              const { start, weights } = weightsX[x];
+              for (let channel = 0; channel < 4; channel += 1) {
+                let sum = 0;
+                for (let k = 0; k < weights.length; k += 1) sum += source[(y * bitmap.width + start + k) * 4 + channel] * weights[k];
+                horizontal[(y * cols + x) * 4 + channel] = roundByte(sum);
+              }
+            }
+            if (y % 64 === 63) await yieldTask();
+          }
+        }
+        let resized = horizontal;
+        if (rows !== bitmap.height) {
+          const weightsY = bilinearWeights(bitmap.height, rows);
+          resized = new Uint8Array(cols * rows * 4);
+          for (let y = 0; y < rows; y += 1) {
+            const { start, weights } = weightsY[y];
+            for (let x = 0; x < cols; x += 1) {
+              for (let channel = 0; channel < 4; channel += 1) {
+                let sum = 0;
+                for (let k = 0; k < weights.length; k += 1) sum += horizontal[((start + k) * cols + x) * 4 + channel] * weights[k];
+                resized[(y * cols + x) * 4 + channel] = roundByte(sum);
+              }
+            }
+            if (y % 32 === 31) await yieldTask();
+          }
+        }
+        const pixels = new Uint32Array(cols * rows);
+        for (let i = 0; i < pixels.length; i += 1) {
+          const offset = i * 4, alpha = resized[offset + 3];
+          if (!alpha) continue;
+          const rgb = [0, 1, 2].map((channel) => {
+            const value = preserveAlpha ? Math.min(255, Math.round(resized[offset + channel] * 255 / alpha)) : resized[offset + channel];
+            return Math.floor(value / 16) * 16;
+          });
+          pixels[i] = ((rgb[0] << 24) | (rgb[1] << 16) | (rgb[2] << 8) | alpha) >>> 0;
+        }
+        return pixels;
+      }
+
+      async function removeBorderBackground(pixels, cols, rows, threshold) {
+        const visited = new Uint8Array(pixels.length), queue = new Uint32Array(pixels.length);
+        let head = 0, tail = 0;
+        function visit(index) {
+          const color = pixels[index];
+          const dark = !(color & 255) || ((color >>> 24) < threshold && ((color >>> 16) & 255) < threshold && ((color >>> 8) & 255) < threshold);
+          if (!visited[index] && dark) { visited[index] = 1; queue[tail++] = index; }
+        }
+        for (let x = 0; x < cols; x += 1) { visit(x); visit((rows - 1) * cols + x); }
+        for (let y = 0; y < rows; y += 1) { visit(y * cols); visit(y * cols + cols - 1); }
+        while (head < tail) {
+          const index = queue[head++], x = index % cols;
+          pixels[index] = 0;
+          if (x > 0) visit(index - 1);
+          if (x < cols - 1) visit(index + 1);
+          if (index >= cols) visit(index - cols);
+          if (index < pixels.length - cols) visit(index + cols);
+          if (head % 65536 === 0) await yieldTask();
+        }
+      }
+
+      async function encodePixels(pixels, cols, rows, settings) {
+        const lines = [], colorTags = new Map();
+        let previous = null;
+        function colorTag(color) {
+          if (!colorTags.has(color)) {
+            const hex = (color & 255) === 255 ? (color >>> 8).toString(16).padStart(6, "0") : color.toString(16).padStart(8, "0");
+            colorTags.set(color, "<color=#" + hex.toUpperCase() + ">");
+          }
+          return colorTags.get(color);
+        }
+        for (let y = 0; y < rows; y += 1) {
+          const parts = [];
+          for (let x = 0; x < cols;) {
+            const color = pixels[y * cols + x];
+            let end = x + 1;
+            while (end < cols && pixels[y * cols + end] === color) end += 1;
+            if (!settings.stream || color !== previous) parts.push(colorTag(color));
+            parts.push("█".repeat(end - x));
+            if (!settings.stream) parts.push("</color>");
+            previous = color;
+            x = end;
+          }
+          lines.push(parts.join(""));
+          if (y % 64 === 63) await yieldTask();
+        }
+        let head = "<size=" + settings.size + "%><line-height=" + settings.lineheight + "%>";
+        let tail = "</line-height></size>";
+        if (settings.voffset) {
+          head += "<voffset=" + (settings.voffset * (settings.size / 100) * (settings.lineheight / 100)).toFixed(2) + "em>";
+          tail = "</voffset>" + tail;
+        }
+        return head + lines.join("\n") + (settings.stream ? "</color>" : "") + tail;
+      }
+
+      async function convertImageEntry(entry, settings) {
+        let bitmap;
+        try {
+          try { bitmap = await createImageBitmap(entry.file); }
+          catch (error) { throw new Error("图片无法解码，请检查格式或文件是否损坏。"); }
+          entry.width = bitmap.width;
+          entry.height = bitmap.height;
+          const cols = settings.cols;
+          const rows = settings.keepAspect ? Math.max(1, Math.round(cols * bitmap.height / bitmap.width)) : settings.rows;
+          if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1 || cols > 1024 || rows > 1024) throw new Error("网格每边须为 1–1,024 格，请减小列数或调整原图比例。");
+          const pixels = await sampleImage(bitmap, cols, rows, settings.preserveAlpha);
+          if (settings.nobg) await removeBorderBackground(pixels, cols, rows, settings.bg_th);
+          return { text: await encodePixels(pixels, cols, rows, settings), cols, rows };
+        } finally {
+          if (bitmap) bitmap.close();
+        }
+      }
+
+      async function runImageConversion(event) {
+        event.preventDefault();
+        if (converting || !imageEntries.length || !converter.converterForm.reportValidity()) return;
+        const settings = {
+          cols: Number(converter.gridCols.value), rows: Number(converter.gridRows.value),
+          size: Number(converter.outputSize.value), lineheight: Number(converter.outputLineHeight.value),
+          bg_th: Number(converter.backgroundThreshold.value), voffset: Number(converter.outputOffset.value),
+          nobg: converter.removeBackground.checked, stream: converter.streamColors.checked,
+          preserveAlpha: converter.preserveAlpha.checked, keepAspect: converter.keepAspect.checked
+        };
+        const selected = Number(converter.imageList.value) || 0;
+        converting = true;
+        converter.conversionOptions.disabled = true;
+        converter.chooseImages.disabled = converter.chooseFolder.disabled = true;
+        converter.conversionProgress.hidden = false;
+        converter.conversionProgress.max = imageEntries.length;
+        converter.conversionProgress.value = 0;
+        refreshImageList(selected);
+        const failures = [];
+        try {
+          for (let index = 0; index < imageEntries.length; index += 1) {
+            const entry = imageEntries[index];
+            entry.result = null;
+            entry.error = "";
+            conversionMessage("正在转换 " + (index + 1) + " / " + imageEntries.length + "：" + entry.file.name);
+            await yieldTask();
+            try { entry.result = await convertImageEntry(entry, settings); }
+            catch (error) {
+              entry.error = error.message || "转换失败，请减小网格后重试。";
+              failures.push(entry.file.name + "：" + entry.error);
+            }
+            converter.conversionProgress.value = index + 1;
+          }
+          const firstSuccess = imageEntries.findIndex((entry) => entry.result);
+          refreshImageList(imageEntries[selected].result ? selected : Math.max(0, firstSuccess));
+          await showSelectedImage();
+          const completed = imageEntries.filter((entry) => entry.result).length;
+          conversionMessage("已完成 " + completed + " / " + imageEntries.length + " 张。" + (failures.length ? failures.join("；") : "结果已载入下方编辑器，可复制或下载 TXT；ZIP 保存各图片的转换结果。"), failures.length > 0);
+          if (completed) showToast("转换完成，已生成富文本和像素预览");
+        } catch (error) {
+          conversionMessage("预览失败，请减小网格后重试。", true);
+        } finally {
+          converting = false;
+          converter.conversionOptions.disabled = false;
+          converter.chooseImages.disabled = converter.chooseFolder.disabled = false;
+          converter.conversionProgress.hidden = true;
+          refreshImageList();
+        }
+      }
+
+      function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+
+      // ZIP's stored method keeps batch download available when opened via file://,
+      // without loading a third-party archive library or triggering many downloads.
+      async function makeTextZip(entries) {
+        const encoder = new TextEncoder(), chunks = [], directory = [];
+        const crcTable = Uint32Array.from({ length: 256 }, (_, byte) => {
+          let value = byte;
+          for (let bit = 0; bit < 8; bit += 1) value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
+          return value >>> 0;
+        });
+        let offset = 0, directorySize = 0;
+        for (const entry of entries) {
+          const name = encoder.encode(entry.outputName), data = encoder.encode(entry.result.text);
+          let crc = 0xffffffff;
+          for (let i = 0; i < data.length; i += 1) {
+            crc = crcTable[(crc ^ data[i]) & 255] ^ (crc >>> 8);
+            if (i > 0 && i % 1048576 === 0) await yieldTask();
+          }
+          crc = (crc ^ 0xffffffff) >>> 0;
+          const local = new Uint8Array(30 + name.length), lv = new DataView(local.buffer);
+          lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0x800, true);
+          lv.setUint16(12, 33, true); lv.setUint32(14, crc, true);
+          lv.setUint32(18, data.length, true); lv.setUint32(22, data.length, true); lv.setUint16(26, name.length, true);
+          local.set(name, 30);
+          chunks.push(local, data);
+          const central = new Uint8Array(46 + name.length), cv = new DataView(central.buffer);
+          cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x800, true);
+          cv.setUint16(14, 33, true); cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+          cv.setUint16(28, name.length, true); cv.setUint32(42, offset, true); central.set(name, 46);
+          directory.push(central);
+          directorySize += central.length;
+          offset += local.length + data.length;
+          if (offset + directorySize > 0xffffffff || entries.length > 65535) throw new Error("批次过大，请减少图片数量后下载。");
+          await yieldTask();
+        }
+        const end = new Uint8Array(22), ev = new DataView(end.buffer);
+        ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, entries.length, true); ev.setUint16(10, entries.length, true);
+        ev.setUint32(12, directorySize, true); ev.setUint32(16, offset, true);
+        return new Blob([...chunks, ...directory, end], { type: "application/zip" });
+      }
+
+      converter.chooseImages.addEventListener("click", () => converter.imageFiles.click());
+      converter.chooseFolder.addEventListener("click", () => converter.imageFolder.click());
+      for (const input of [converter.imageFiles, converter.imageFolder]) input.addEventListener("change", () => {
+        addImageFiles(input.files);
+        input.value = "";
+      });
+      converter.chooseImages.addEventListener("dragover", (event) => {
+        event.preventDefault();
+        if (!converting) converter.chooseImages.classList.add("drag-over");
+      });
+      converter.chooseImages.addEventListener("dragleave", () => converter.chooseImages.classList.remove("drag-over"));
+      converter.chooseImages.addEventListener("drop", (event) => {
+        event.preventDefault();
+        converter.chooseImages.classList.remove("drag-over");
+        addImageFiles(event.dataTransfer.files);
+      });
+      converter.imageList.addEventListener("change", () => showSelectedImage());
+      converter.clearImages.addEventListener("click", () => {
+        if (converting) return;
+        previewRequest += 1;
+        imageEntries = [];
+        converter.sourcePreview.replaceChildren();
+        converter.sourcePreview.hidden = true;
+        converter.sourceInfo.textContent = "可多次添加图片；动图只转换第一帧。";
+        refreshImageList();
+        conversionMessage("图片列表已清空。下方文字仍可复制和下载。");
+      });
+      converter.converterForm.addEventListener("submit", runImageConversion);
+      converter.downloadBatch.addEventListener("click", async () => {
+        const entries = imageEntries.filter((entry) => entry.result).map((entry) => ({ outputName: entry.outputName, result: entry.result }));
+        if (!entries.length) return;
+        converter.downloadBatch.disabled = true;
+        try { downloadBlob(await makeTextZip(entries), "richtext_out.zip"); }
+        catch (error) { conversionMessage(error.message || "下载失败，请重试。", true); }
+        finally { converter.downloadBatch.disabled = converting; }
+      });
+      document.getElementById("downloadText").addEventListener("click", () => {
+        if (editor.value) downloadBlob(new Blob([editor.value], { type: "text/plain;charset=utf-8" }), outputFilename);
+      });
+      document.getElementById("copyText").addEventListener("click", async () => {
+        if (!editor.value) return;
+        try {
+          await navigator.clipboard.writeText(editor.value);
+          showToast("富文本已复制");
+        } catch (error) {
+          const start = editor.selectionStart, end = editor.selectionEnd;
+          editor.focus({ preventScroll: true });
+          editor.select();
+          let copied = false;
+          try { copied = document.execCommand("copy"); } catch (copyError) { /* Manual copy remains available. */ }
+          if (copied) editor.setSelectionRange(start, end);
+          showToast(copied ? "富文本已复制" : "已选中文本，请按 Ctrl+C 复制");
+        }
+      });
+      try {
+        const saved = JSON.parse(localStorage.getItem(settingsKey) || "{}");
+        for (const id of optionNumbers) {
+          const value = saved[id], input = converter[id];
+          if (Number.isInteger(value) && value >= Number(input.min) && value <= Number(input.max)) input.value = value;
+        }
+        for (const id of optionChecks) if (typeof saved[id] === "boolean") converter[id].checked = saved[id];
+      } catch (error) { /* Storage may be unavailable in private or local-file contexts. */ }
+      converter.conversionOptions.addEventListener("input", () => {
+        updateGridHint();
+        if (imageEntries.some((entry) => entry.result)) conversionMessage("设置已修改，重新转换后生效。");
+        const saved = {};
+        for (const id of optionNumbers) saved[id] = Number(converter[id].value);
+        for (const id of optionChecks) saved[id] = converter[id].checked;
+        try { localStorage.setItem(settingsKey, JSON.stringify(saved)); } catch (error) { /* Settings are optional. */ }
+      });
+      updateGridHint();
+
+      // One history for native input and programmatic edits. setRangeText/value
+      // changes cannot be assumed to join the textarea's native undo history.
+      const undoButton = document.getElementById("undoButton");
+      const redoButton = document.getElementById("redoButton");
+      const undoHistory = [], redoHistory = [];
+      let lastEditorState = null;
+      let pendingInputState = null;
+      let inputGroup = "";
+      let lastInputTime = 0;
+      let composing = false;
+      let compositionState = null;
+      let compositionTimer = 0;
+
+      function captureEditorState() {
+        return {
+          text: editor.value, filename: outputFilename,
+          start: editor.selectionStart, end: editor.selectionEnd, direction: editor.selectionDirection,
+          scrollTop: editor.scrollTop, scrollLeft: editor.scrollLeft,
+          mode: document.getElementById("renderMode").value
+        };
+      }
+
+      function updateHistoryButtons() {
+        undoButton.disabled = undoHistory.length === 0;
+        redoButton.disabled = redoHistory.length === 0;
+      }
+
+      function recordEditorChange(before, kind = "command") {
+        const after = captureEditorState();
+        pendingInputState = null;
+        lastEditorState = after;
+        if (!before || (before.text === after.text && before.filename === after.filename)) return;
+        const now = performance.now();
+        const previous = undoHistory[undoHistory.length - 1];
+        const canGroup = ["insertText", "deleteContentBackward", "deleteContentForward"].includes(kind);
+        if (canGroup && inputGroup === kind && now - lastInputTime < 1000 && previous &&
+            before.start === before.end && previous.after.start === before.start && previous.after.end === before.end &&
+            previous.after.text === before.text && previous.after.filename === before.filename) {
+          previous.after = after;
+        } else {
+          undoHistory.push({ before, after });
+        }
+        redoHistory.length = 0;
+        inputGroup = canGroup ? kind : "";
+        lastInputTime = now;
+        // Bound snapshot storage for long pixel-art text, keeping at least the latest edit.
+        let characters = undoHistory.reduce((total, entry) => total + entry.before.text.length + entry.after.text.length, 0);
+        while (undoHistory.length > 1 && (undoHistory.length > 100 || characters > 8000000)) {
+          const removed = undoHistory.shift();
+          characters -= removed.before.text.length + removed.after.text.length;
+        }
+        updateHistoryButtons();
+      }
+
+      function finishComposition() {
+        window.clearTimeout(compositionTimer);
+        if (composing || !compositionState) return;
+        const before = compositionState;
+        compositionState = null;
+        recordEditorChange(before, "composition");
+        inputGroup = "";
+      }
+
+      function editEditor(change) {
+        finishComposition();
+        const before = captureEditorState();
+        inputGroup = "";
+        change();
+        recordEditorChange(before);
+      }
+
+      function restoreEditorState(state) {
+        editor.value = state.text;
+        setOutputFilename(state.filename);
+        document.getElementById("renderMode").value = state.mode;
+        editor.focus({ preventScroll: true });
+        editor.setSelectionRange(state.start, state.end, state.direction);
+        editor.scrollTop = state.scrollTop;
+        editor.scrollLeft = state.scrollLeft;
+        pendingInputState = null;
+        lastEditorState = captureEditorState();
+        inputGroup = "";
+        render();
+      }
+
+      function moveEditorHistory(from, to, side) {
+        if (composing) return;
+        finishComposition();
+        inputGroup = "";
+        const entry = from.pop();
+        if (!entry) return;
+        to.push(entry);
+        restoreEditorState(entry[side]);
+        updateHistoryButtons();
+      }
+
+      function undoEditor() { moveEditorHistory(undoHistory, redoHistory, "before"); }
+      function redoEditor() { moveEditorHistory(redoHistory, undoHistory, "after"); }
+
+      undoButton.addEventListener("click", undoEditor);
+      redoButton.addEventListener("click", redoEditor);
+      editor.addEventListener("beforeinput", (event) => {
+        if (composing || compositionState) return;
+        if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
+          if (event.cancelable) {
+            event.preventDefault();
+            (event.inputType === "historyUndo" ? undoEditor : redoEditor)();
+          }
+          return;
+        }
+        pendingInputState = captureEditorState();
+      });
+      editor.addEventListener("input", (event) => {
+        if (composing || compositionState || event.isComposing) {
+          scheduleRender();
+          return;
+        }
+        if (event.inputType === "historyUndo" || event.inputType === "historyRedo") {
+          // Some browser/OS edits are not cancellable in beforeinput.
+          if (lastEditorState) restoreEditorState(lastEditorState);
+          (event.inputType === "historyUndo" ? undoEditor : redoEditor)();
+        } else {
+          recordEditorChange(pendingInputState || lastEditorState, event.inputType || "input");
+          scheduleRender();
+        }
+      });
+      editor.addEventListener("compositionstart", () => {
+        finishComposition();
+        compositionState = captureEditorState();
+        composing = true;
+        inputGroup = "";
+      });
+      editor.addEventListener("compositionend", () => {
+        composing = false;
+        // Include the final input event regardless of the browser's composition event order.
+        compositionTimer = window.setTimeout(finishComposition, 0);
+        scheduleRender();
+      });
+      for (const eventName of ["pointerdown", "blur"]) {
+        editor.addEventListener(eventName, () => { inputGroup = ""; });
+      }
+      editor.addEventListener("select", () => {
+        if (!composing && !compositionState && lastEditorState && editor.value === lastEditorState.text) {
+          lastEditorState = captureEditorState();
+        }
+      });
+
+      const paintUI = Object.fromEntries([
+        "colorLibrary", "favoriteColorCount", "favoriteColors", "favoriteColorPicker", "favoriteColorHex",
+        "favoriteColorName", "saveFavoriteColor", "saveCurrentColor", "gradientLibrary", "gradientPresetCount",
+        "gradientStops", "addGradientStop", "reverseGradient", "gradientMode", "gradientDemo", "applyGradient",
+        "gradientPresetName", "saveGradientPreset", "gradientPresets", "paintNotice"
+      ].map((id) => [id, document.getElementById(id)]));
+      const paintStorageKey = "richtext-paint-library-v1";
+      const newPaintId = () => "paint-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+      const defaultColors = [
+        ["红色", "#e5484d"], ["橙色", "#f08c00"], ["绿色", "#2f9e44"],
+        ["蓝色", "#1c7ed6"], ["紫色", "#9c36b5"]
+      ];
+      const paintLibrary = {
+        colors: defaultColors.map(([name, color]) => ({ id: newPaintId(), name, color })),
+        gradients: [
+          { id: newPaintId(), name: "暖阳", colors: ["#f08c00", "#e5484d"], mode: "tag" },
+          { id: newPaintId(), name: "海风", colors: ["#1c7ed6", "#22b8cf", "#63e6be"], mode: "characters" },
+          { id: newPaintId(), name: "霞光", colors: ["#f08c00", "#e5484d", "#9c36b5"], mode: "tag" }
+        ],
+        draft: { colors: ["#f08c00", "#e5484d"], mode: "tag" },
+        colorOpen: true, gradientOpen: false
+      };
+      const graphemeSegmenter = typeof Intl.Segmenter === "function" ? new Intl.Segmenter("zh", { granularity: "grapheme" }) : null;
+
+      // One shared chart serves text, favorite-color drafts, and every gradient stop.
+      const colorTablePopup = document.getElementById("colorTablePopup");
+      const colorTableGrid = document.getElementById("colorTableGrid");
+      let colorTableTarget = null;
+      const chartHues = [
+        ["红", "#ff0000"], ["橙", "#ff8000"], ["黄", "#ffff00"], ["黄绿", "#80ff00"], ["绿", "#00b050"],
+        ["青", "#00bfbf"], ["天蓝", "#0070c0"], ["蓝", "#0000ff"], ["紫", "#8000ff"], ["品红", "#ff00ff"]
+      ];
+      const chartColors = ["#ffffff", "#f2f2f2", "#d9d9d9", "#bfbfbf", "#a6a6a6", "#808080", "#595959", "#404040", "#262626", "#000000"]
+        .map((color) => ({ color, name: "灰阶" }));
+      for (const amount of [0.8, 0.55, 0.3, 0, -0.25, -0.5, -0.75]) {
+        for (const [name, base] of chartHues) {
+          let color = "#";
+          for (const offset of [1, 3, 5]) {
+            const channel = parseInt(base.slice(offset, offset + 2), 16);
+            const value = amount >= 0 ? channel + (255 - channel) * amount : channel * (1 + amount);
+            color += Math.round(value).toString(16).padStart(2, "0");
+          }
+          chartColors.push({ color, name: (amount > 0 ? "浅" : amount < 0 ? "深" : "") + name });
+        }
+      }
+
+      function showChartColor(color) {
+        document.getElementById("colorTableSwatch").style.background = color;
+        document.getElementById("colorTableValue").textContent = color.toUpperCase();
+      }
+
+      function closeColorTable(restoreFocus = false) {
+        const target = colorTableTarget;
+        colorTableTarget = null;
+        colorTablePopup.hidden = true;
+        if (target) {
+          target.button.setAttribute("aria-expanded", "false");
+          if (restoreFocus && target.button.isConnected) target.button.focus({ preventScroll: true });
+        }
+      }
+
+      function positionColorTable() {
+        if (!colorTableTarget) return;
+        const anchor = colorTableTarget.button.getBoundingClientRect(), bounds = colorTablePopup.getBoundingClientRect();
+        const left = Math.max(8, Math.min(anchor.left, innerWidth - bounds.width - 8));
+        const preferredTop = anchor.bottom + 6 + bounds.height <= innerHeight - 8 ? anchor.bottom + 6 : anchor.top - bounds.height - 6;
+        colorTablePopup.style.left = left + "px";
+        colorTablePopup.style.top = Math.max(8, Math.min(preferredTop, innerHeight - bounds.height - 8)) + "px";
+      }
+
+      function openColorTable(button, color, title, hint, choose) {
+        if (colorTableTarget && colorTableTarget.button === button) { closeColorTable(true); return; }
+        closeColorTable();
+        colorTableTarget = { button, choose };
+        button.setAttribute("aria-expanded", "true");
+        document.getElementById("colorTableTitle").textContent = title;
+        document.getElementById("colorTableHint").textContent = hint;
+        showChartColor(color);
+        const cells = Array.from(colorTableGrid.children);
+        const selected = cells.find((cell) => cell.dataset.color === color) || cells[0];
+        for (const cell of cells) {
+          cell.setAttribute("aria-pressed", String(cell.dataset.color === color));
+          cell.tabIndex = cell === selected ? 0 : -1;
+        }
+        colorTablePopup.hidden = false;
+        positionColorTable();
+        selected.focus({ preventScroll: true });
+        showChartColor(color);
+      }
+
+      for (const { color, name } of chartColors) {
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "color-table-cell";
+        cell.dataset.color = color;
+        cell.style.setProperty("--swatch", color);
+        cell.title = name + " " + color.toUpperCase();
+        cell.setAttribute("aria-label", cell.title);
+        cell.addEventListener("pointerenter", () => showChartColor(color));
+        cell.addEventListener("focus", () => {
+          for (const sibling of colorTableGrid.children) sibling.tabIndex = sibling === cell ? 0 : -1;
+          showChartColor(color);
+        });
+        cell.addEventListener("click", () => {
+          const target = colorTableTarget;
+          closeColorTable();
+          if (!target) return;
+          target.choose(color);
+          if (document.activeElement !== editor && target.button.isConnected) target.button.focus({ preventScroll: true });
+        });
+        colorTableGrid.append(cell);
+      }
+      colorTableGrid.addEventListener("keydown", (event) => {
+        const cells = Array.from(colorTableGrid.children), index = cells.indexOf(event.target);
+        const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -10, ArrowDown: 10 };
+        let next;
+        if (Object.hasOwn(offsets, event.key)) next = Math.max(0, Math.min(cells.length - 1, index + offsets[event.key]));
+        else if (event.key === "Home") next = Math.floor(index / 10) * 10;
+        else if (event.key === "End") next = Math.floor(index / 10) * 10 + 9;
+        if (index < 0 || next == null) return;
+        event.preventDefault();
+        cells[next].focus({ preventScroll: true });
+      });
+      document.getElementById("closeColorTable").addEventListener("click", () => closeColorTable(true));
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && colorTableTarget) { event.preventDefault(); closeColorTable(true); }
+      });
+      document.addEventListener("pointerdown", (event) => {
+        if (colorTableTarget && !colorTablePopup.contains(event.target) && !colorTableTarget.button.contains(event.target)) closeColorTable();
+      });
+      document.addEventListener("scroll", (event) => {
+        if (colorTableTarget && !colorTablePopup.contains(event.target)) positionColorTable();
+      }, true);
+      window.addEventListener("resize", () => closeColorTable());
+      const textChartButton = document.getElementById("textColorTable");
+      textChartButton.addEventListener("click", () => openColorTable(textChartButton, customColor.value, "文字颜色色表", "点击色块直接修改选中文字；点 ☆ 可收藏当前颜色。", (color) => {
+        setColorDraft(color);
+        applyTextPaint("color", [color]);
+      }));
+      const favoriteChartButton = document.getElementById("favoriteColorTable");
+      favoriteChartButton.addEventListener("click", () => openColorTable(favoriteChartButton, paintUI.favoriteColorPicker.value, "收藏颜色色表", "点击色块填入颜色，再点「保存颜色」加入常用颜色。", (color) => {
+        paintUI.favoriteColorPicker.value = color;
+        paintUI.favoriteColorHex.value = color.toUpperCase();
+        paintUI.favoriteColorHex.setCustomValidity("");
+      }));
+
+      function normalizePaintColor(value) {
+        const hex = String(value || "").trim().replace(/^#/, "").toLowerCase();
+        if (/^[0-9a-f]{6}$/.test(hex)) return "#" + hex;
+        if (/^[0-9a-f]{3}$/.test(hex)) return "#" + Array.from(hex, (digit) => digit + digit).join("");
+        return "";
+      }
+
+      function validGradientColors(colors) {
+        if (!Array.isArray(colors) || colors.length < 2 || colors.length > 6) return null;
+        const normalized = colors.map(normalizePaintColor);
+        return normalized.every(Boolean) ? normalized : null;
+      }
+
+      function paintNotice(message = "") {
+        paintUI.paintNotice.textContent = message;
+        paintUI.paintNotice.hidden = !message;
+      }
+
+      try {
+        const saved = JSON.parse(localStorage.getItem(paintStorageKey) || "null");
+        if (saved && typeof saved === "object") {
+          if (Array.isArray(saved.colors)) paintLibrary.colors = saved.colors.flatMap((item) => {
+            const color = normalizePaintColor(item && item.color);
+            return color ? [{ id: newPaintId(), name: String(item.name || color.toUpperCase()).slice(0, 24), color }] : [];
+          });
+          if (Array.isArray(saved.gradients)) paintLibrary.gradients = saved.gradients.flatMap((item) => {
+            const colors = validGradientColors(item && item.colors);
+            return colors && ["tag", "characters"].includes(item.mode)
+              ? [{ id: newPaintId(), name: String(item.name || "渐变").slice(0, 24), colors, mode: item.mode }] : [];
+          });
+          const colors = validGradientColors(saved.draft && saved.draft.colors);
+          if (colors && ["tag", "characters"].includes(saved.draft.mode)) paintLibrary.draft = { colors, mode: saved.draft.mode };
+          for (const key of ["colorOpen", "gradientOpen"]) if (typeof saved[key] === "boolean") paintLibrary[key] = saved[key];
+        }
+      } catch (error) { /* Invalid or inaccessible storage falls back to the built-in palette. */ }
+
+      function savePaintLibrary() {
+        try {
+          localStorage.setItem(paintStorageKey, JSON.stringify(paintLibrary));
+          paintNotice();
+          return true;
+        } catch (error) {
+          paintNotice("已在本页保留设置，但浏览器无法保存到本地；刷新后将丢失这些修改。");
+          return false;
+        }
+      }
+
+      function setColorDraft(color, name = "") {
+        customColor.value = color;
+        paintUI.favoriteColorPicker.value = color;
+        paintUI.favoriteColorHex.value = color.toUpperCase();
+        paintUI.favoriteColorHex.setCustomValidity("");
+        paintUI.favoriteColorName.value = name;
+      }
+
+      function makePresetButton(name, colors, onApply) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "preset-apply";
+        const swatch = document.createElement("span");
+        swatch.className = "preset-swatch" + (colors.length > 1 ? " gradient-swatch" : "");
+        swatch.setAttribute("aria-hidden", "true");
+        swatch.style.background = colors.length > 1 ? "linear-gradient(90deg, " + colors.join(",") + ")" : colors[0];
+        const label = document.createElement("span");
+        label.className = "preset-name";
+        label.textContent = name;
+        button.append(swatch, label);
+        button.title = name + " · " + colors.join(" → ");
+        button.addEventListener("click", onApply);
+        return button;
+      }
+
+      function presetAction(label, title, action) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "preset-action";
+        button.textContent = label;
+        button.title = title;
+        button.setAttribute("aria-label", title);
+        button.addEventListener("click", action);
+        return button;
+      }
+
+      function renderFavoriteColors() {
+        paintUI.favoriteColors.replaceChildren();
+        paintUI.favoriteColorCount.textContent = paintLibrary.colors.length + " 色";
+        for (const item of paintLibrary.colors) {
+          const wrapper = document.createElement("div");
+          wrapper.className = "preset-item";
+          const button = makePresetButton(item.name, [item.color], () => {
+            setColorDraft(item.color, item.name);
+            applyTextPaint("color", [item.color]);
+          });
+          button.dataset.color = item.color;
+          wrapper.append(button, presetAction("×", "删除颜色：" + item.name, () => {
+            paintLibrary.colors = paintLibrary.colors.filter((color) => color !== item);
+            renderFavoriteColors();
+            renderGradientStops();
+            savePaintLibrary();
+          }));
+          paintUI.favoriteColors.append(wrapper);
+        }
+        if (!paintLibrary.colors.length) {
+          const empty = document.createElement("span");
+          empty.className = "library-hint";
+          empty.textContent = "还没有常用颜色，选择颜色后点击保存。";
+          paintUI.favoriteColors.append(empty);
+        }
+      }
+
+      function saveFavoriteColor(color, name = "") {
+        const existing = paintLibrary.colors.find((item) => item.color === color);
+        if (existing) { if (name.trim()) existing.name = name.trim(); }
+        else paintLibrary.colors.push({ id: newPaintId(), name: name.trim() || color.toUpperCase(), color });
+        paintLibrary.colorOpen = true;
+        paintUI.colorLibrary.open = true;
+        renderFavoriteColors();
+        renderGradientStops();
+        showToast(savePaintLibrary() ? "常用颜色已保存" : "颜色已添加到当前页面");
+      }
+
+      function interpolatedColor(colors, position) {
+        const scaled = Math.max(0, Math.min(1, position)) * (colors.length - 1);
+        const index = Math.min(colors.length - 2, Math.floor(scaled));
+        const fraction = scaled - index;
+        let color = "#";
+        for (const offset of [1, 3, 5]) {
+          const from = parseInt(colors[index].slice(offset, offset + 2), 16);
+          const to = parseInt(colors[index + 1].slice(offset, offset + 2), 16);
+          color += Math.round(from + (to - from) * fraction).toString(16).padStart(2, "0");
+        }
+        return color;
+      }
+
+      function graphemes(text) {
+        return graphemeSegmenter ? Array.from(graphemeSegmenter.segment(text), (part) => part.segment) : Array.from(text);
+      }
+
+      function renderGradientDemo() {
+        const { colors, mode } = paintLibrary.draft;
+        paintUI.gradientDemo.replaceChildren();
+        const sample = "渐变文字 Aa 123";
+        if (mode === "tag") {
+          const span = document.createElement("span");
+          span.textContent = sample;
+          Object.assign(span.style, { backgroundImage: "linear-gradient(90deg," + colors.join(",") + ")", backgroundClip: "text", color: "transparent" });
+          paintUI.gradientDemo.append(span);
+        } else {
+          const characters = graphemes(sample);
+          characters.forEach((character, index) => {
+            const span = document.createElement("span");
+            span.textContent = character;
+            span.style.whiteSpace = "pre";
+            span.style.color = interpolatedColor(colors, index / Math.max(1, characters.length - 1));
+            paintUI.gradientDemo.append(span);
+          });
+        }
+        paintUI.addGradientStop.disabled = colors.length >= 6;
+      }
+
+      function renderGradientStops() {
+        if (colorTableTarget && paintUI.gradientStops.contains(colorTableTarget.button)) closeColorTable();
+        paintUI.gradientStops.replaceChildren();
+        paintUI.gradientMode.value = paintLibrary.draft.mode;
+        paintLibrary.draft.colors.forEach((color, index) => {
+          const row = document.createElement("div");
+          row.className = "gradient-stop";
+          const label = document.createElement("span");
+          label.className = "stop-number";
+          label.textContent = "色 " + (index + 1);
+          const picker = document.createElement("input");
+          picker.type = "color";
+          picker.value = color;
+          picker.setAttribute("aria-label", "第 " + (index + 1) + " 个渐变颜色");
+          const hex = document.createElement("input");
+          hex.className = "hex-input";
+          hex.value = color.toUpperCase();
+          hex.maxLength = 7;
+          hex.spellcheck = false;
+          hex.setAttribute("aria-label", "第 " + (index + 1) + " 个渐变颜色 HEX");
+          const quick = document.createElement("select");
+          quick.setAttribute("aria-label", "第 " + (index + 1) + " 色快捷选择");
+          quick.add(new Option("选常用色…", ""));
+          const choices = new Map(defaultColors.map(([name, value]) => [value, name]));
+          for (const favorite of paintLibrary.colors) choices.set(favorite.color, favorite.name);
+          for (const [value, name] of choices) quick.add(new Option(name + " " + value.toUpperCase(), value));
+          function update(value) {
+            paintLibrary.draft.colors[index] = value;
+            picker.value = value;
+            hex.setCustomValidity("");
+            renderGradientDemo();
+            savePaintLibrary();
+          }
+          picker.addEventListener("input", () => { hex.value = picker.value.toUpperCase(); update(picker.value); });
+          hex.addEventListener("input", () => {
+            const normalized = normalizePaintColor(hex.value);
+            hex.setCustomValidity(normalized ? "" : "请输入 3 位或 6 位 HEX 颜色，如 #FF8800。");
+            if (normalized) update(normalized);
+          });
+          quick.addEventListener("change", () => {
+            if (!quick.value) return;
+            hex.value = quick.value.toUpperCase();
+            update(quick.value);
+            quick.value = "";
+          });
+          const chartButton = document.createElement("button");
+          chartButton.type = "button";
+          chartButton.className = "ghost-button gradient-table-button";
+          chartButton.textContent = "色表";
+          chartButton.setAttribute("aria-label", "第 " + (index + 1) + " 个渐变颜色色表");
+          chartButton.setAttribute("aria-haspopup", "dialog");
+          chartButton.setAttribute("aria-controls", "colorTablePopup");
+          chartButton.setAttribute("aria-expanded", "false");
+          chartButton.addEventListener("click", () => openColorTable(chartButton, picker.value, "渐变第 " + (index + 1) + " 色", "点击色块修改当前色点；点「应用渐变」更新文字。", (value) => {
+            hex.value = value.toUpperCase();
+            update(value);
+          }));
+          const remove = presetAction("×", "删除第 " + (index + 1) + " 个渐变颜色", () => {
+            paintLibrary.draft.colors.splice(index, 1);
+            renderGradientStops();
+            renderGradientDemo();
+            savePaintLibrary();
+          });
+          remove.className = "ghost-button remove-stop";
+          remove.disabled = paintLibrary.draft.colors.length <= 2;
+          row.append(label, picker, hex, chartButton, quick, remove);
+          paintUI.gradientStops.append(row);
+        });
+      }
+
+      function loadGradientPreset(preset) {
+        paintLibrary.draft = { colors: [...preset.colors], mode: preset.mode };
+        paintUI.gradientPresetName.value = preset.name;
+        renderGradientStops();
+        renderGradientDemo();
+        savePaintLibrary();
+      }
+
+      function renderGradientPresets() {
+        paintUI.gradientPresets.replaceChildren();
+        paintUI.gradientPresetCount.textContent = paintLibrary.gradients.length + " 个预设";
+        for (const preset of paintLibrary.gradients) {
+          const wrapper = document.createElement("div");
+          wrapper.className = "preset-item";
+          const button = makePresetButton(preset.name, preset.colors, () => {
+            loadGradientPreset(preset);
+            applyCurrentGradient();
+          });
+          const badge = document.createElement("span");
+          badge.className = "preset-mode";
+          badge.textContent = preset.mode === "tag" ? "标签" : "逐字";
+          button.append(badge);
+          button.dataset.presetName = preset.name;
+          wrapper.append(button, presetAction("调色", "调色：" + preset.name, () => loadGradientPreset(preset)),
+            presetAction("×", "删除渐变预设：" + preset.name, () => {
+              paintLibrary.gradients = paintLibrary.gradients.filter((item) => item !== preset);
+              renderGradientPresets();
+              savePaintLibrary();
+            }));
+          paintUI.gradientPresets.append(wrapper);
+        }
+      }
+
+      function checkGradientInputs() {
+        for (const hex of paintUI.gradientStops.querySelectorAll(".hex-input")) if (!hex.reportValidity()) return false;
+        return true;
+      }
+
+      // Paint operations replace existing paint tags, while leaving other markup
+      // intact. Expand a selection directly enclosed by a matching paint wrapper.
+      function paintTagName(name) {
+        const canonical = TAG_ALIASES[name.toLowerCase()] || name.toLowerCase();
+        return canonical === "color" || canonical === "gradient" ? canonical : "";
+      }
+
+      function selectedPaintRange() {
+        const source = editor.value;
+        let start = editor.selectionStart, end = editor.selectionEnd;
+        const selected = source.slice(start, end);
+        if (start === end) return { start, end, inner: "" };
+        const opening = /<(color|colour|textcolor|gradient)(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^<>]*?))?\s*>$/i;
+        const closing = /^<\/(color|colour|textcolor|gradient)\s*>/i;
+        while (start > 0) {
+          const before = source.slice(0, start).match(opening), after = source.slice(end).match(closing);
+          if (!before || !after || paintTagName(before[1]) !== paintTagName(after[1])) break;
+          let depth = 0, balanced = true;
+          for (const token of source.slice(start, end).matchAll(new RegExp(TAG_RE.source, "g"))) {
+            if (paintTagName(token[2]) !== paintTagName(before[1])) continue;
+            depth += token[1] ? -1 : 1;
+            if (depth < 0) { balanced = false; break; }
+          }
+          if (!balanced || depth !== 0) break;
+          start -= before[0].length;
+          end += after[0].length;
+        }
+        return { start, end, inner: selected };
+      }
+
+      function perCharacterGradient(source, colors) {
+        const pieces = [];
+        let last = 0, total = 0;
+        const append = (text) => {
+          const units = graphemes(text);
+          total += units.filter((unit) => !/^[\r\n]+$/.test(unit)).length;
+          pieces.push({ units });
+        };
+        for (const match of source.matchAll(new RegExp(TAG_RE.source, "g"))) {
+          append(source.slice(last, match.index));
+          pieces.push({ tag: match[0] });
+          last = match.index + match[0].length;
+        }
+        append(source.slice(last));
+        let index = 0;
+        return pieces.map((piece) => piece.tag || piece.units.map((unit) => {
+          if (/^[\r\n]+$/.test(unit)) return unit;
+          const color = interpolatedColor(colors, index++ / Math.max(1, total - 1));
+          return "<color=" + color + ">" + unit + "</color>";
+        }).join("")).join("");
+      }
+
+      function applyTextPaint(mode, colors) {
+        const range = selectedPaintRange();
+        const raw = range.inner || (mode === "color" ? "彩色文字" : "渐变文字");
+        const inner = raw.replace(new RegExp(TAG_RE.source, "g"), (token, closing, name) => paintTagName(name) ? "" : token);
+        let insertion, offset = 0, selectionLength;
+        if (mode === "characters") {
+          insertion = perCharacterGradient(inner, colors);
+          selectionLength = insertion.length;
+        } else {
+          const tag = mode === "color" ? "color" : "gradient";
+          const open = "<" + tag + "=" + colors.join(",") + ">";
+          insertion = open + inner + "</" + tag + ">";
+          offset = open.length;
+          selectionLength = inner.length;
+        }
+        editEditor(() => {
+          editor.setRangeText(insertion, range.start, range.end, "end");
+          editor.focus({ preventScroll: true });
+          editor.setSelectionRange(range.start + offset, range.start + offset + selectionLength);
+        });
+        scheduleRender();
+      }
+
+      function applyCurrentGradient() {
+        if (checkGradientInputs()) applyTextPaint(paintLibrary.draft.mode, paintLibrary.draft.colors);
+      }
+
+      paintUI.favoriteColorPicker.addEventListener("input", () => {
+        paintUI.favoriteColorHex.value = paintUI.favoriteColorPicker.value.toUpperCase();
+        paintUI.favoriteColorHex.setCustomValidity("");
+      });
+      paintUI.favoriteColorHex.addEventListener("input", () => {
+        const color = normalizePaintColor(paintUI.favoriteColorHex.value);
+        paintUI.favoriteColorHex.setCustomValidity(color ? "" : "请输入 3 位或 6 位 HEX 颜色，如 #FF8800。");
+        if (color) paintUI.favoriteColorPicker.value = color;
+      });
+      paintUI.saveFavoriteColor.addEventListener("click", () => {
+        if (paintUI.favoriteColorHex.reportValidity()) saveFavoriteColor(normalizePaintColor(paintUI.favoriteColorHex.value), paintUI.favoriteColorName.value);
+      });
+      paintUI.saveCurrentColor.addEventListener("click", () => saveFavoriteColor(customColor.value));
+      paintUI.addGradientStop.addEventListener("click", () => {
+        if (!checkGradientInputs() || paintLibrary.draft.colors.length >= 6) return;
+        paintLibrary.draft.colors.push(paintLibrary.draft.colors[paintLibrary.draft.colors.length - 1]);
+        renderGradientStops(); renderGradientDemo(); savePaintLibrary();
+      });
+      paintUI.reverseGradient.addEventListener("click", () => {
+        if (!checkGradientInputs()) return;
+        paintLibrary.draft.colors.reverse();
+        renderGradientStops(); renderGradientDemo(); savePaintLibrary();
+      });
+      paintUI.gradientMode.addEventListener("change", () => {
+        paintLibrary.draft.mode = paintUI.gradientMode.value;
+        renderGradientDemo(); savePaintLibrary();
+      });
+      paintUI.applyGradient.addEventListener("click", applyCurrentGradient);
+      paintUI.saveGradientPreset.addEventListener("click", () => {
+        if (!checkGradientInputs()) return;
+        let name = paintUI.gradientPresetName.value.trim();
+        if (!name) {
+          let number = 1;
+          while (paintLibrary.gradients.some((item) => item.name === "渐变 " + number)) number += 1;
+          name = "渐变 " + number;
+        }
+        const preset = { name, colors: [...paintLibrary.draft.colors], mode: paintLibrary.draft.mode };
+        const existing = paintLibrary.gradients.find((item) => item.name === name);
+        if (existing) Object.assign(existing, preset);
+        else paintLibrary.gradients.push({ id: newPaintId(), ...preset });
+        paintUI.gradientPresetName.value = name;
+        renderGradientPresets();
+        showToast(savePaintLibrary() ? "渐变预设已保存" : "预设已添加到当前页面");
+      });
+      paintUI.colorLibrary.open = paintLibrary.colorOpen;
+      paintUI.gradientLibrary.open = paintLibrary.gradientOpen;
+      for (const [id, key] of [["colorLibrary", "colorOpen"], ["gradientLibrary", "gradientOpen"]]) {
+        paintUI[id].addEventListener("toggle", () => {
+          if (paintLibrary[key] === paintUI[id].open) return;
+          paintLibrary[key] = paintUI[id].open;
+          savePaintLibrary();
+        });
+      }
+      renderFavoriteColors();
+      renderGradientStops();
+      renderGradientDemo();
+      renderGradientPresets();
+
+      function applyFormat(tag, value, placeholder) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const selected = editor.value.slice(start, end);
+        const inner = selected || placeholder || "文字";
+        const valuePart = value == null || value === "" ? "" : "=" + value;
+        const openTag = "<" + tag + valuePart + ">";
+        const closeTag = "</" + tag + ">";
+        const insertion = openTag + inner + closeTag;
+
+        editEditor(() => {
+          editor.setRangeText(insertion, start, end, "end");
+          const innerStart = start + openTag.length;
+          editor.setSelectionRange(innerStart, innerStart + inner.length);
+          editor.focus({ preventScroll: true });
+        });
+        scheduleRender();
+      }
+
+      function insertAtCursor(text) {
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        editEditor(() => {
+          editor.setRangeText(text, start, end, "end");
+          const caret = start + text.length;
+          editor.setSelectionRange(caret, caret);
+          editor.focus({ preventScroll: true });
+        });
+        scheduleRender();
+      }
+
+      function handleFormatButton(button) {
+        const tag = button.dataset.tag;
+        if (!tag) {
+          return;
+        }
+        if (tag === "gradient") { applyCurrentGradient(); return; }
+        const value = button.dataset.value != null ? button.dataset.value : null;
+        if (tag === "color" && normalizePaintColor(value)) {
+          setColorDraft(normalizePaintColor(value));
+          applyTextPaint("color", [normalizePaintColor(value)]);
+          return;
+        }
+        const placeholders = {
+          color: "彩色文字",
+          bgcolor: "背景文字",
+          size: "字号文字",
+          font: "字体文字",
+          align: "需要居中的一行",
+          glow: "发光文字",
+          shadow: "阴影文字",
+          outline: "描边文字",
+          gradient: "渐变文字",
+          b: "加粗文字",
+          i: "斜体文字",
+          u: "下划线文字",
+          s: "删除线文字",
+          mark: "高亮文字",
+          code: "code",
+          sup: "上标",
+          sub: "下标"
+        };
+        applyFormat(tag, value, placeholders[tag] || "文字");
+      }
+
+      document.querySelectorAll(".tool[data-tag], .color-dot[data-tag]").forEach((button) => {
+        button.addEventListener("click", () => handleFormatButton(button));
+      });
+
+      sizeSelect.addEventListener("change", () => {
+        if (!sizeSelect.value) {
+          return;
+        }
+        applyFormat("size", sizeSelect.value, "字号文字");
+        sizeSelect.value = "";
+      });
+
+      customColor.addEventListener("change", () => {
+        setColorDraft(customColor.value);
+        applyTextPaint("color", [customColor.value]);
+      });
+
+      document.querySelectorAll(".cheat-card").forEach((card) => {
+        card.addEventListener("click", () => {
+          const demo = DEMOS[card.dataset.demo];
+          if (!demo) {
+            return;
+          }
+          insertAtCursor(demo);
+          showToast("示例已插入");
+        });
+      });
+
+      document.getElementById("exampleButton").addEventListener("click", () => {
+        editEditor(() => {
+          editor.value = DEFAULT_TEXT;
+          setOutputFilename("richtext.txt");
+          document.getElementById("renderMode").value = "auto";
+          editor.focus({ preventScroll: true });
+          editor.setSelectionRange(editor.value.length, editor.value.length);
+        });
+        render();
+        paperWrap.scrollTop = 0;
+        showToast("示例已载入");
+      });
+
+      document.getElementById("clearButton").addEventListener("click", () => {
+        editEditor(() => {
+          editor.value = "";
+          setOutputFilename("richtext.txt");
+          editor.focus({ preventScroll: true });
+        });
+        render();
+        showToast("已清空");
+      });
+
+      // Small public hook: lets other scripts or tests drive the display without
+      // needing to know how the editor is wired up internally.
+      window.RichTextDisplay = Object.freeze({
+        setText(text) {
+          editEditor(() => { editor.value = String(text == null ? "" : text); });
+          render();
+        },
+        getText() {
+          return editor.value;
+        },
+        render,
+        undo: undoEditor,
+        redo: redoEditor
+      });
+
+      document.querySelector(".editor-panel").addEventListener("keydown", (event) => {
+        if (event.isComposing || composing || event.keyCode === 229) return;
+        const key = event.key.toLowerCase();
+        const modifier = event.ctrlKey || event.metaKey;
+        if (modifier && !event.altKey && (key === "z" || key === "y") &&
+            (event.target === editor || !event.target.matches("input, select, textarea"))) {
+          event.preventDefault();
+          (key === "y" || event.shiftKey ? redoEditor : undoEditor)();
+          return;
+        }
+        if (event.target !== editor) return;
+        if (/^(Arrow|Home|End|Page)/.test(event.key)) inputGroup = "";
+        if (event.key === "Tab") {
+          event.preventDefault();
+          insertAtCursor("  ");
+          return;
+        }
+
+        if (!modifier || event.altKey) {
+          return;
+        }
+
+        const shortcutMap = { b: ["b", null], i: ["i", null], u: ["u", null] };
+        if (!shortcutMap[key]) {
+          return;
+        }
+
+        event.preventDefault();
+        const [tag, value] = shortcutMap[key];
+        handleFormatButton({
+          dataset: { tag, ...(value == null ? {} : { value }) }
+        });
+      });
+
+      editor.value = DEFAULT_TEXT;
+      lastEditorState = captureEditorState();
+      updateHistoryButtons();
+      render();
+    })();
+  </script>
+</body>
+</html>
